@@ -1,18 +1,12 @@
-const sitemap = {
-  '': 'Jimmy G',
-  'life': 'Life',
-  'life/photos': 'Photos',
-  'life/photos/ski': 'Ski',
-  'life/photos/dive': 'Dive',
-  'work': 'Work'
-};
-
 (function() {
   const scripts = document.getElementsByTagName('script');
   const src = scripts[scripts.length - 1].getAttribute('src');
   const root = src.replace('_script/jimmyg.js', '');
   const depth = (src.match(/\.\.\//g) || []).length;
   const path = depth > 0 ? window.location.pathname.split('/').filter(p => p && p !== 'index.html').slice(-depth).join('/') : '';
+
+  // Load sitemap.js synchronously (works on file://)
+  document.write('<script src="' + root + '_script/sitemap.js"><\/script>');
 
   // Viewport meta
   const viewport = document.createElement('meta');
@@ -39,6 +33,18 @@ main { padding: 1rem 0; }
     // Wrap content in main
     const main = document.createElement('main');
     while (document.body.firstChild) main.appendChild(document.body.firstChild);
+
+    // If sitemap failed to load, show fallback link
+    if (typeof sitemap === 'undefined') {
+      const header = document.createElement('header');
+      const nav = document.createElement('nav');
+      nav.innerHTML = '<a href="' + root + 'sitemap/index.html">Sitemap</a>';
+      header.appendChild(nav);
+      document.body.innerHTML = '';
+      document.body.appendChild(header);
+      document.body.appendChild(main);
+      return;
+    }
 
     // Helper: get direct children of a path
     function getChildren(p) {

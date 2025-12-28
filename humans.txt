@@ -9,9 +9,10 @@ is shared across all pages. Directories may contain _asset/ for source files.
 
 /* HTML PAGE FORMAT */
 
-Pages contain only:
+Pages contain:
   1. A <script> tag loading the relative path to _script/jimmyg.js
-  2. The body content (starting with an <h1>)
+  2. A <noscript> tag with link to sitemap.html (for no-JS browsers)
+  3. The body content (starting with an <h1>)
 
 The script injects viewport meta, inline styles, header (breadcrumbs + section
 nav), wraps content in <main>, and adds a footer with Top link.
@@ -30,22 +31,26 @@ Breadcrumbs: Path to current section with > separator. All items linked
 except current section (plain text). Leaf pages don't add breadcrumb depth.
 
 Section nav: Children of current section. On leaf pages, shows siblings
-with current page as plain text. Arrow shown on items with children.
+with current page as plain text. Sections shown in bold.
 
 Footer: Right-aligned Top link, only visible when page is scrollable and
 not at top.
 
 /* SITEMAP */
 
-Navigation is defined in the sitemap object at the top of jimmyg.js.
+Navigation structure is defined in sitemap/index.html. Run `make sitemap`
+to generate _script/sitemap.js which is loaded by jimmyg.js. The sitemap
+page appears in navigation like any other page.
 
 /* AUTHORING */
 
 To create a new page:
   1. Create a directory with index.html
-  2. Add script tag and content starting with <h1>
-  3. Update sitemap in jimmyg.js
+  2. Add script tag, noscript tag, and content starting with <h1>
+  3. Add the page to sitemap.html
+  4. Run `make sitemap`
 
-/* TERMINAL BROWSERS */
+/* NO-JS FALLBACK */
 
-Designed to work in browsh (headless Firefox) or carbonyl (Chromium).
+Each page includes a <noscript> link to sitemap.html. Browsers without
+JavaScript (lynx, w3m, links, elinks) can navigate via the sitemap.
