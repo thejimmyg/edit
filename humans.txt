@@ -50,6 +50,24 @@ To create a new page:
   3. Add the page to sitemap.html
   4. Run `make sitemap`
 
+/* EDITING */
+
+Ctrl+E or ?edit enters edit mode. Content becomes editable in the browser.
+
+Keyboard shortcuts:
+  Ctrl+2/3/4  Heading levels
+  Ctrl+0      Paragraph
+
+Drag images onto page to insert. Images use _gallery/filename.jpg paths.
+Run `make` to process source images into _gallery/.
+
+Click "Copy HTML" then paste into editor. Click "View" to exit edit mode.
+
+/* IMAGE GALLERIES */
+
+Consecutive <img> tags form a row. The script wraps them in a flex container
+with equal widths. Separate rows with any block element (p, h2, etc).
+
 /* NO-JS FALLBACK */
 
 Each page includes a <noscript> link to sitemap.html. Browsers without

@@ -4,6 +4,7 @@
   const root = src.replace('_script/jimmyg.js', '');
   const depth = (src.match(/\.\.\//g) || []).length;
   const path = depth > 0 ? window.location.pathname.split('/').filter(p => p && p !== 'index.html').slice(-depth).join('/') : '';
+  const editMode = new URLSearchParams(location.search).has('edit');
 
   // Load sitemap.js synchronously (works on file://)
   document.write('<script src="' + root + '_script/sitemap.js"><\/script>');
@@ -23,6 +24,8 @@ header nav a, header nav span { margin-right: 0.5rem; }
 header nav a.section { font-weight: bold; }
 footer { text-align: right; padding: 2rem 0 1rem; }
 main { padding: 1rem 0; }
+.gallery-row { display: flex; gap: 0.5rem; margin: 1rem 0; }
+.gallery-row img { flex: 1; min-width: 0; height: auto; object-fit: cover; }
 `;
   document.head.appendChild(style);
 
@@ -107,6 +110,29 @@ main { padding: 1rem 0; }
     window.addEventListener('scroll', updateTopLink);
     window.addEventListener('resize', updateTopLink);
 
+    // Wrap consecutive images in gallery rows
+    function wrapImageRows(container) {
+      const children = Array.from(container.childNodes);
+      let i = 0;
+      while (i < children.length) {
+        const node = children[i];
+        if (node.nodeName === 'IMG') {
+          const row = document.createElement('div');
+          row.className = 'gallery-row';
+          node.parentNode.insertBefore(row, node);
+          while (i < children.length && children[i].nodeName === 'IMG') {
+            row.appendChild(children[i]);
+            i++;
+          }
+        } else {
+          i++;
+        }
+      }
+    }
+    if (!editMode) {
+      wrapImageRows(main);
+    }
+
     // Assemble
     document.body.innerHTML = '';
     document.body.appendChild(header);
@@ -114,5 +140,22 @@ main { padding: 1rem 0; }
     document.body.appendChild(footer);
 
     updateTopLink();
+
+    // Load edit script if in edit mode
+    if (editMode) {
+      const editScript = document.createElement('script');
+      editScript.src = root + '_script/edit.js';
+      document.head.appendChild(editScript);
+    }
+
+    // Ctrl+E to enter edit mode
+    if (!editMode) {
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'e' && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          location.search = 'edit';
+        }
+      });
+    }
   });
 })();
