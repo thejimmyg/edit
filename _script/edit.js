@@ -66,6 +66,15 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
     }
   });
 
+  // Compute SHA256 hash of file, return first 12 hex chars
+  async function hashFile(file) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex.slice(0, 12);
+  }
+
   // Drag and drop handling
   let dragCounter = 0;
   const dropHint = document.createElement('div');
@@ -92,7 +101,7 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
     e.preventDefault();
   });
 
-  document.addEventListener('drop', (e) => {
+  document.addEventListener('drop', async (e) => {
     e.preventDefault();
     dragCounter = 0;
     dropHint.style.display = 'none';
@@ -108,17 +117,15 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       insertPoint = selection.getRangeAt(0);
     }
 
-    files.forEach(file => {
+    for (const file of files) {
       const img = document.createElement('img');
-      const filename = file.name;
-      img.src = '_gallery/' + filename;
+      const hash = await hashFile(file);
       img.className = 'pending';
-      img.alt = filename;
+      img.dataset.hash = hash;
 
       // Show preview using data URL
       const reader = new FileReader();
       reader.onload = (ev) => {
-        img.dataset.preview = ev.target.result;
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
@@ -129,7 +136,7 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       } else {
         main.appendChild(img);
       }
-    });
+    }
   });
 
   // Format text: 4-space indent, sentences on new lines
@@ -158,10 +165,10 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
         // Handle images specially - just output the tag
         if (tag === 'img') {
           let src = node.getAttribute('src') || '';
-          const alt = node.alt || '';
-          // Fix pending images
+          // Use hash for pending images
           if (node.className === 'pending' || src.startsWith('data:')) {
-            src = '_gallery/' + alt;
+            const hash = node.dataset.hash || '';
+            src = '_gallery/' + hash + '.jpg';
           }
           result += '<img src="' + src + '">';
           continue;

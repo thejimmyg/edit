@@ -110,7 +110,7 @@ main { padding: 1rem 0; }
     window.addEventListener('scroll', updateTopLink);
     window.addEventListener('resize', updateTopLink);
 
-    // Wrap consecutive images in gallery rows
+    // Wrap consecutive images in gallery rows and add srcset
     function wrapImageRows(container) {
       const children = Array.from(container.childNodes);
       let i = 0;
@@ -121,7 +121,16 @@ main { padding: 1rem 0; }
           row.className = 'gallery-row';
           node.parentNode.insertBefore(row, node);
           while (i < children.length && children[i].nodeName === 'IMG') {
-            row.appendChild(children[i]);
+            const img = children[i];
+            // Add srcset for gallery images
+            const match = img.src.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
+            if (match) {
+              const hash = match[1];
+              const base = img.src.replace(/[a-f0-9]{12}\.jpg$/, '');
+              img.srcset = [300, 600, 1200, 2400].map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
+              img.sizes = '(max-width: 600px) 100vw, 50vw';
+            }
+            row.appendChild(img);
             i++;
           }
         } else {
