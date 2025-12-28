@@ -1,0 +1,51 @@
+/* SITE ARCHITECTURE */
+
+Opens directly from filesystem - no web server required.
+
+/* DIRECTORY STRUCTURE */
+
+Each page is an index.html in its own directory. The root _script/jimmyg.js
+is shared across all pages. Directories may contain _asset/ for source files.
+
+/* HTML PAGE FORMAT */
+
+Pages contain only:
+  1. A <script> tag loading the relative path to _script/jimmyg.js
+  2. The body content (starting with an <h1>)
+
+The script injects viewport meta, inline styles, header (breadcrumbs + section
+nav), wraps content in <main>, and adds a footer with Top link.
+
+/* LAYOUT */
+
+Single column, full width, browser defaults. Sticky header with backdrop blur.
+
+Breadcrumbs and section nav both left-aligned with gap between.
+
+/* NAVIGATION */
+
+Pages with children are "sections". Pages without children are "leaves".
+
+Breadcrumbs: Path to current section with > separator. All items linked
+except current section (plain text). Leaf pages don't add breadcrumb depth.
+
+Section nav: Children of current section. On leaf pages, shows siblings
+with current page as plain text. Arrow shown on items with children.
+
+Footer: Right-aligned Top link, only visible when page is scrollable and
+not at top.
+
+/* SITEMAP */
+
+Navigation is defined in the sitemap object at the top of jimmyg.js.
+
+/* AUTHORING */
+
+To create a new page:
+  1. Create a directory with index.html
+  2. Add script tag and content starting with <h1>
+  3. Update sitemap in jimmyg.js
+
+/* TERMINAL BROWSERS */
+
+Designed to work in browsh (headless Firefox) or carbonyl (Chromium).
