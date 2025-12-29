@@ -39,13 +39,18 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
   bar.className = 'edit-bar';
   bar.innerHTML = `
     <div class="edit-instructions">
-      <kbd>Ctrl+2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> Heading &nbsp;
-      <kbd>Ctrl+0</kbd> Paragraph &nbsp;
-      Drag images to add
+      Drag and Drop images
+      <kbd>Ctrl+2/3/4</kbd> Heading
+      <kbd>Ctrl+0</kbd> Paragraph
+      <kbd>Ctrl+L</kbd> List
+      <kbd>Tab</kbd> Indent
+      <kbd>Ctrl+K</kbd> Link
+      <kbd>Ctrl+I</kbd> Alt
     </div>
     <div style="display:flex;align-items:center;gap:0.5rem">
-      <button id="edit-save">Copy HTML</button>
       <span id="edit-status"></span>
+      <button id="edit-copy">Copy HTML</button>
+      <a id="edit-save" href="#" download="index.html">Save</a>
       <a href="${location.pathname}">View</a>
     </div>
   `;
@@ -54,14 +59,92 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
   // Add padding to body so content isn't hidden behind bar
   document.body.style.paddingBottom = '4rem';
 
-  // Keyboard shortcuts for headings
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Ctrl+number for headings/paragraph
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
       const key = e.key;
       if (key >= '0' && key <= '4') {
         e.preventDefault();
         const tag = key === '0' ? 'p' : 'h' + key;
         document.execCommand('formatBlock', false, '<' + tag + '>');
+      }
+      // Ctrl+K for links
+      if (key === 'k') {
+        e.preventDefault();
+        const selection = window.getSelection();
+        const text = selection.toString();
+        let existingHref = '';
+        // Check if selection is inside a link
+        let node = selection.anchorNode;
+        while (node && node !== main) {
+          if (node.nodeName === 'A') {
+            existingHref = node.href || '';
+            break;
+          }
+          node = node.parentNode;
+        }
+        const url = prompt('Link URL:', existingHref);
+        if (url !== null) {
+          if (url === '') {
+            document.execCommand('unlink');
+          } else {
+            document.execCommand('createLink', false, url);
+          }
+        }
+      }
+      // Ctrl+L for bulleted list
+      if (key === 'l') {
+        e.preventDefault();
+        document.execCommand('insertUnorderedList');
+      }
+    }
+    // Ctrl+I for image alt text
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'i') {
+      e.preventDefault();
+      const selection = window.getSelection();
+      let node = selection.anchorNode;
+      let img = null;
+      // Check if selection is on or near an image
+      if (node && node.nodeName === 'IMG') {
+        img = node;
+      } else if (node) {
+        // Check siblings and parent's children for nearby image
+        const parent = node.parentNode;
+        if (parent) {
+          // Check if previous or next sibling is an image
+          if (node.previousSibling && node.previousSibling.nodeName === 'IMG') {
+            img = node.previousSibling;
+          } else if (node.nextSibling && node.nextSibling.nodeName === 'IMG') {
+            img = node.nextSibling;
+          } else if (parent.nodeName === 'IMG') {
+            img = parent;
+          }
+        }
+      }
+      if (img) {
+        const alt = prompt('Image alt text:', img.alt || '');
+        if (alt !== null) {
+          img.alt = alt;
+        }
+      }
+    }
+    // Tab/Shift+Tab for list indent/dedent
+    if (e.key === 'Tab') {
+      const selection = window.getSelection();
+      let node = selection.anchorNode;
+      // Check if we're in a list item
+      while (node && node !== main) {
+        if (node.nodeName === 'LI') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            document.execCommand('outdent');
+          } else {
+            document.execCommand('indent');
+          }
+          return;
+        }
+        node = node.parentNode;
       }
     }
   });
@@ -123,10 +206,14 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       img.className = 'pending';
       img.dataset.hash = hash;
 
-      // Show preview using data URL
+      // Show preview using data URL and capture dimensions
       const reader = new FileReader();
       reader.onload = (ev) => {
         img.src = ev.target.result;
+        img.onload = () => {
+          img.dataset.width = img.naturalWidth;
+          img.dataset.height = img.naturalHeight;
+        };
       };
       reader.readAsDataURL(file);
 
@@ -148,47 +235,138 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       .trim();
   }
 
-  // Convert DOM to formatted HTML
-  function formatElement(el, indent) {
-    const ind = '    '.repeat(indent);
+  // Get image tag with hash handling
+  function imgTag(node) {
+    let src = node.getAttribute('src') || '';
+    if (node.className === 'pending' || src.startsWith('data:')) {
+      src = '_gallery/' + (node.dataset.hash || '') + '.jpg';
+    }
+    let tag = '<img src="' + src + '"';
+    if (node.alt) tag += ' alt="' + node.alt.replace(/"/g, '&quot;') + '"';
+    if (node.dataset.width) tag += ' data-width="' + node.dataset.width + '"';
+    if (node.dataset.height) tag += ' data-height="' + node.dataset.height + '"';
+    tag += '>';
+    return tag;
+  }
+
+  // Get inline content (text, links, images) from an element
+  function inlineContent(el) {
     let result = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'a') {
+          result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
+        } else if (tag === 'img') {
+          result += imgTag(node);
+        } else if (tag === 'br') {
+          // ignore
+        } else {
+          result += inlineContent(node); // recurse into spans, etc.
+        }
+      }
+    }
+    return result;
+  }
+
+  // Format a list
+  function formatList(ul, indent = 1) {
+    const items = Array.from(ul.children).filter(el => el.tagName === 'LI');
+    if (items.length === 0) return '';
+
+    const ind = '    '.repeat(indent);
+    let result = '<ul>\n';
+    for (const li of items) {
+      result += ind + '<li>';
+      for (const node of li.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          result += node.textContent.trim();
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toLowerCase();
+          if (tag === 'a') {
+            result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
+          } else if (tag === 'ul') {
+            result += '\n' + formatList(node, indent + 1);
+          } else if (tag === 'img') {
+            result += imgTag(node);
+          }
+        }
+      }
+      result += '</li>\n';
+    }
+    result += '</ul>';
+    return result;
+  }
+
+  // Output images from a container, respecting BR elements as row breaks
+  function formatImages(container) {
+    let result = '';
+    for (const node of container.childNodes) {
+      if (node.nodeName === 'IMG') {
+        result += imgTag(node);
+      } else if (node.nodeName === 'BR') {
+        result += '\n';
+      }
+      // Ignore other nodes (whitespace text, etc.)
+    }
+    return result;
+  }
+
+  // Convert DOM to formatted HTML
+  function formatElement(el) {
+    let result = '';
+    let lastWasImage = false;
 
     for (const node of el.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent.trim();
         if (text) {
-          result += ind + formatText(text) + '\n';
+          result += '<p>\n    ' + formatText(text) + '\n</p>';
+          lastWasImage = false;
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const tag = node.tagName.toLowerCase();
 
-        // Handle images specially - just output the tag
         if (tag === 'img') {
-          let src = node.getAttribute('src') || '';
-          // Use hash for pending images
-          if (node.className === 'pending' || src.startsWith('data:')) {
-            const hash = node.dataset.hash || '';
-            src = '_gallery/' + hash + '.jpg';
-          }
-          result += '<img src="' + src + '">';
-          continue;
-        }
-
-        // Block elements: h1-h6, p, div
-        if (/^(h[1-6]|p|div)$/.test(tag)) {
-          const innerText = node.textContent.trim();
-          if (innerText) {
-            result += '<' + tag + '>\n';
-            result += ind + formatText(innerText) + '\n';
-            result += '</' + tag + '>';
-          }
+          result += imgTag(node);
+          lastWasImage = true;
         } else if (tag === 'br') {
-          result += '<br>';
+          // BR after images = new row
+          if (lastWasImage) {
+            result += '\n';
+          }
+        } else if (/^h[1-6]$/.test(tag)) {
+          const text = node.textContent.trim();
+          if (text) {
+            result += '<' + tag + '>\n    ' + formatText(text) + '\n</' + tag + '>';
+          }
+          lastWasImage = false;
+        } else if (tag === 'p' || tag === 'div') {
+          // Check if contains only images (no text content)
+          const text = node.textContent.trim();
+          const images = node.querySelectorAll('img');
+          if (!text && images.length > 0) {
+            // Output images with BR handling, then add newline for next row
+            result += formatImages(node);
+            result += '\n';
+            lastWasImage = true;
+          } else {
+            const content = inlineContent(node).trim();
+            if (content) {
+              result += '<p>\n    ' + formatText(content) + '\n</p>';
+            }
+            lastWasImage = false;
+          }
+        } else if (tag === 'ul') {
+          result += formatList(node);
+          lastWasImage = false;
         } else if (tag === 'a') {
           result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
+          lastWasImage = false;
         } else {
-          // Other inline elements - just get text
-          result += node.textContent;
+          lastWasImage = false;
         }
       }
     }
@@ -196,17 +374,17 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
     return result;
   }
 
-  // Save functionality
-  document.getElementById('edit-save').addEventListener('click', async () => {
-    // Generate formatted HTML
-    const content = formatElement(main, 1);
-
-    // Build complete HTML
-    const html = '<script src="' + root + '_script/jimmyg.js"><\/script>' +
+  // Generate complete HTML
+  function generateHTML() {
+    const content = formatElement(main);
+    return '<script src="' + root + '_script/jimmyg.js"><\/script>' +
       '<noscript><p><a href="' + root + 'sitemap/index.html">Sitemap</a></p></noscript>' +
       content + '\n';
+  }
 
-    // Copy to clipboard
+  // Copy to clipboard functionality
+  document.getElementById('edit-copy').addEventListener('click', async () => {
+    const html = generateHTML();
     const status = document.getElementById('edit-status');
     try {
       await navigator.clipboard.writeText(html);
@@ -216,6 +394,18 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       status.textContent = 'Failed';
       setTimeout(() => status.textContent = '', 2000);
     }
+  });
+
+  // Save link - update href on hover so right-click "Save As" works
+  const saveLink = document.getElementById('edit-save');
+  let blobUrl = null;
+
+  saveLink.addEventListener('mouseenter', () => {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    const html = generateHTML();
+    const blob = new Blob([html], { type: 'text/html' });
+    blobUrl = URL.createObjectURL(blob);
+    saveLink.href = blobUrl;
   });
 
 })();

@@ -24,8 +24,10 @@ header nav a, header nav span { margin-right: 0.5rem; }
 header nav a.section { font-weight: bold; }
 footer { text-align: right; padding: 2rem 0 1rem; }
 main { padding: 1rem 0; }
-.gallery-row { display: flex; gap: 0.5rem; margin: 1rem 0; }
-.gallery-row img { flex: 1; min-width: 0; height: auto; object-fit: cover; }
+.gallery { border-collapse: separate; border-spacing: 1rem; max-width: 100vh; width: 100%; margin-left: -1rem; table-layout: fixed; }
+.gallery td { padding: 0; text-align: center; vertical-align: middle; }
+.gallery a { display: block; line-height: 0; }
+.gallery img {max-width: 100%; object-fit: contain; }
 `;
   document.head.appendChild(style);
 
@@ -110,28 +112,72 @@ main { padding: 1rem 0; }
     window.addEventListener('scroll', updateTopLink);
     window.addEventListener('resize', updateTopLink);
 
-    // Wrap consecutive images in gallery rows and add srcset
+    // Wrap consecutive images in gallery table rows and add srcset
     function wrapImageRows(container) {
       const children = Array.from(container.childNodes);
       let i = 0;
+
+      // Helper: greatest common divisor
+      function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+      // Helper: least common multiple
+      function lcm(a, b) { return a * b / gcd(a, b); }
+
       while (i < children.length) {
         const node = children[i];
         if (node.nodeName === 'IMG') {
-          const row = document.createElement('div');
-          row.className = 'gallery-row';
-          node.parentNode.insertBefore(row, node);
-          while (i < children.length && children[i].nodeName === 'IMG') {
-            const img = children[i];
-            // Add srcset for gallery images
-            const match = img.src.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
-            if (match) {
-              const hash = match[1];
-              const base = img.src.replace(/[a-f0-9]{12}\.jpg$/, '');
-              img.srcset = [300, 600, 1200, 2400].map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
-              img.sizes = '(max-width: 600px) 100vw, 50vw';
+          // Collect all consecutive image rows (separated by non-IMG nodes that are whitespace-only text)
+          const rows = [];
+          while (i < children.length) {
+            if (children[i].nodeName === 'IMG') {
+              const row = [];
+              while (i < children.length && children[i].nodeName === 'IMG') {
+                row.push(children[i]);
+                i++;
+              }
+              rows.push(row);
+            } else if (children[i].nodeType === Node.TEXT_NODE && !children[i].textContent.trim()) {
+              i++; // Skip whitespace
+            } else {
+              break; // Non-image, non-whitespace content ends the table
             }
-            row.appendChild(img);
-            i++;
+          }
+
+          if (rows.length === 0) continue;
+
+          // Calculate LCM of all row lengths for colspan
+          const cols = rows.map(r => r.length).reduce(lcm);
+
+          // Create table
+          const table = document.createElement('table');
+          table.className = 'gallery';
+          rows[0][0].parentNode.insertBefore(table, rows[0][0]);
+
+          for (const row of rows) {
+            const tr = document.createElement('tr');
+            table.appendChild(tr);
+            const colspan = cols / row.length;
+
+            for (const img of row) {
+              const td = document.createElement('td');
+              td.colSpan = colspan;
+              tr.appendChild(td);
+
+              // Add srcset and link for gallery images
+              const match = img.src.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
+              if (match) {
+                const hash = match[1];
+                const base = img.src.replace(/[a-f0-9]{12}\.jpg$/, '');
+                img.srcset = [300, 600, 1200, 2400].map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
+                img.sizes = '(max-width: 768px) ' + Math.floor(100 / row.length) + 'vw, 50vw';
+                // Wrap in link to highest res
+                const link = document.createElement('a');
+                link.href = base + hash + '-2400.jpg';
+                link.appendChild(img);
+                td.appendChild(link);
+              } else {
+                td.appendChild(img);
+              }
+            }
           }
         } else {
           i++;
@@ -140,6 +186,21 @@ main { padding: 1rem 0; }
     }
     if (!editMode) {
       wrapImageRows(main);
+    } else {
+      // In edit mode, convert newlines between images to BR elements
+      const children = Array.from(main.childNodes);
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('\n')) {
+          // Check if between images
+          const prev = children[i - 1];
+          const next = children[i + 1];
+          if ((prev && prev.nodeName === 'IMG') || (next && next.nodeName === 'IMG')) {
+            const br = document.createElement('br');
+            node.parentNode.replaceChild(br, node);
+          }
+        }
+      }
     }
 
     // Assemble

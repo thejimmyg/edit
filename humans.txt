@@ -57,6 +57,10 @@ Ctrl+E or ?edit enters edit mode. Content becomes editable in the browser.
 Keyboard shortcuts:
   Ctrl+2/3/4  Heading levels
   Ctrl+0      Paragraph
+  Ctrl+L      Bulleted list
+  Tab         Indent list item
+  Shift+Tab   Dedent list item
+  Ctrl+K      Add/edit link (prompt for URL, empty to remove)
 
 Drag images onto page to insert. Images are referenced by SHA256 hash
 (first 12 chars) as _gallery/HASH.jpg.
