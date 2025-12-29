@@ -41,26 +41,28 @@ index:
 	after=$$(wc -l < $(PICTURE_INDEX)); \
 	echo "Indexed $$((after - before)) new images ($$after total)"
 
-# Generate gallery thumbnails from indexed images
+# Generate gallery thumbnails from indexed images (relative to each HTML file)
 gallery:
-	@mkdir -p _gallery
-	@# Find all hash references in HTML files
-	@grep -rhoP '_gallery/[a-f0-9]{12}\.jpg' --include='*.html' . | \
-		sed 's|_gallery/||; s|\.jpg||' | sort -u | while read hash; do \
-		src=$$(grep "^$$hash	" $(PICTURE_INDEX) | cut -f2); \
-		if [ -n "$$src" ]; then \
-			for size in $(SIZES); do \
-				out="_gallery/$${hash}-$${size}.jpg"; \
-				if [ ! -f "$$out" ]; then \
-					echo "Generating $$out from $$src"; \
-					convert "$$src" -auto-orient -resize $${size}x$${size}\> -sharpen 0x1 -strip -interlace Plane -quality 75 "$$out"; \
+	@for html in $$(grep -rlP '_gallery/[a-f0-9]{12}\.jpg' --include='index.html' .); do \
+		dir=$$(dirname "$$html"); \
+		mkdir -p "$$dir/_gallery"; \
+		grep -oP '_gallery/[a-f0-9]{12}\.jpg' "$$html" | \
+			sed 's|_gallery/||; s|\.jpg||' | sort -u | while read hash; do \
+			src=$$(grep "^$$hash	" $(PICTURE_INDEX) | cut -f2); \
+			if [ -n "$$src" ]; then \
+				for size in $(SIZES); do \
+					out="$$dir/_gallery/$${hash}-$${size}.jpg"; \
+					if [ ! -f "$$out" ]; then \
+						echo "Generating $$out from $$src"; \
+						convert "$$src" -auto-orient -resize $${size}x$${size}\> -sharpen 0x1 -strip -interlace Plane -quality 75 "$$out"; \
+					fi; \
+				done; \
+				if [ ! -f "$$dir/_gallery/$${hash}.jpg" ]; then \
+					ln -s "$${hash}-800.jpg" "$$dir/_gallery/$${hash}.jpg"; \
 				fi; \
-			done; \
-			if [ ! -f "_gallery/$${hash}.jpg" ]; then \
-				ln -s "$${hash}-800.jpg" "_gallery/$${hash}.jpg"; \
+			else \
+				echo "Warning: No source found for hash $$hash in $$html"; \
 			fi; \
-		else \
-			echo "Warning: No source found for hash $$hash"; \
-		fi; \
+		done; \
 	done
 	@echo "Gallery complete"
