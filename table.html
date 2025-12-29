@@ -1,0 +1,55 @@
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body { margin: 0; padding: 0; }
+.container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+
+
+  .gallery {
+    border-collapse: collapse;
+    max-width: 134vh;
+    margin: 0 auto;
+    table-layout: fixed;
+  }
+  .gallery td {
+    padding: 0.5rem;  /* 0.5 + 0.5 = 1rem between cells */
+  }
+  /* Remove outer padding */
+  .gallery td:first-child { padding-left: 0; }
+  .gallery td:last-child { padding-right: 0; }
+  .gallery tr:first-child td { padding-top: 0; }
+  .gallery tr:last-child td { padding-bottom: 0; }
+
+  .gallery img {
+    display: block;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100vh;
+    max-height: 95vh;
+    object-fit: contain;
+  }
+
+
+
+
+</style>
+
+<body>
+
+
+<main><div class="container">
+<p>This is a long paragraph before designed to look at the padding just before or after the table. It should hopefully wrap around the way we want it to.</p>
+<p>This is a long paragraph before designed to look at the padding just before or after the table. It should hopefully wrap around the way we want it to.</p>
+
+<table class="gallery">
+
+<tr><td colspan="1"><a href="_gallery/a72c61c4d0d3-2400.jpg"><img src="_gallery/a72c61c4d0d3.jpg" alt="Claire in red scarf"></a></td><td colspan="1"><a href="_gallery/e7041a6b9810-2400.jpg"><img src="_gallery/e7041a6b9810.jpg" alt="Emily looking at phone"></a></td></tr>
+
+<tr><td colspan="1"><a href="_gallery/831d68af59cb-2400.jpg"><img src="_gallery/831d68af59cb.jpg"></a></td><td colspan="1"><a href="_gallery/0ed1d5c8e425-2400.jpg"><img src="_gallery/0ed1d5c8e425.jpg" alt="Eddie finally doing the big monkey bar loop in Alderly Edge Park" data-width="6240" data-height="4160"></a></td></tr>
+
+<tr><td colspan="2"><a href="_gallery/b2c77321a577-2400.jpg"><img src="_gallery/b2c77321a577.jpg" data-width="4160" data-height="6240""></a></td></tr>
+
+</table>
+<p>This is a long paragraph before designed to look at the padding just before or after the table. It should hopefully wrap around the way we want it to.</p>
+<p>This is a long paragraph before designed to look at the padding just before or after the table. It should hopefully wrap around the way we want it to.</p>
+
+</div></main>
+</body></html>

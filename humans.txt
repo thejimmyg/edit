@@ -4,13 +4,13 @@ Opens directly from filesystem - no web server required.
 
 /* DIRECTORY STRUCTURE */
 
-Each page is an index.html in its own directory. The root _script/jimmyg.js
+Each page is an index.html in its own directory. The root _script/view.js
 is shared across all pages. Directories may contain _asset/ for source files.
 
 /* HTML PAGE FORMAT */
 
 Pages contain:
-  1. A <script> tag loading the relative path to _script/jimmyg.js
+  1. A <script> tag loading the relative path to _script/view.js
   2. A <noscript> tag with link to sitemap.html (for no-JS browsers)
   3. The body content (starting with an <h1>)
 
@@ -27,11 +27,17 @@ Breadcrumbs and section nav both left-aligned with gap between.
 
 Pages with children are "sections". Pages without children are "leaves".
 
-Breadcrumbs: Path to current section with > separator. All items linked
+Site title: Bold link to home, text from sitemap root entry.
+
+Breadcrumbs: Path to current section with / separator. All items linked
 except current section (plain text). Leaf pages don't add breadcrumb depth.
 
 Section nav: Children of current section. On leaf pages, shows siblings
-with current page as plain text. Sections shown in bold.
+with current page as plain text.
+
+Unlisted pages: Pages not in the sitemap inherit navigation from their
+nearest ancestor that is in the sitemap. For example, individual blog posts
+show the same navigation as the blog section page.
 
 Footer: Right-aligned Top link, only visible when page is scrollable and
 not at top.
@@ -39,7 +45,7 @@ not at top.
 /* SITEMAP */
 
 Navigation structure is defined in sitemap/index.html. Run `make sitemap`
-to generate _script/sitemap.js which is loaded by jimmyg.js. The sitemap
+to generate _script/sitemap.js which is loaded by view.js. The sitemap
 page appears in navigation like any other page.
 
 /* AUTHORING */
@@ -76,7 +82,7 @@ dimensions are stored as data-width and data-height attributes.
 
 Image rows: Images on the same line form a gallery row. Press Enter between
 images to create separate rows. The saved HTML preserves line breaks which
-jimmyg.js uses to build the gallery table.
+view.js uses to build the gallery table.
 
 Saving:
   "Copy HTML" - copies formatted HTML to clipboard via navigator.clipboard API
@@ -98,10 +104,11 @@ Images are content-addressed by SHA256 hash. Workflow:
   2. Drag images in edit mode - computes hash, inserts _gallery/HASH.jpg
   3. `make gallery` - finds hashes in HTML, generates thumbnails from index
 
-Generates 300, 600, 1200, 2400px sizes. The base HASH.jpg symlinks to 1200px.
-Requires ImageMagick (convert command).
+Generates multiple sizes; HASH.jpg symlinks to a mid-size as no-JS fallback.
+See Makefile for sizes and compression settings. Requires ImageMagick.
 
-jimmyg.js adds srcset to gallery images so the browser picks the right size.
+view.js picks the appropriate size based on display width × device pixel
+ratio (capped at 2x), so mobile gets smaller files while retina stays sharp.
 
 /* NO-JS FALLBACK */
 

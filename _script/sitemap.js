@@ -1,5 +1,6 @@
 const sitemap = {
-  '': 'Jimmy G',
+  '': 'Blackhorse News',
+  'blog': 'Blog',
   'life': 'Life',
   'life/photos': 'Photos',
   'life/photos/ski': 'Ski',

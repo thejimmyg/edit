@@ -2,13 +2,13 @@
   const main = document.querySelector('main .container');
   if (!main) return;
 
-  // Get root path from the jimmyg.js script src
+  // Get root path from the view.js script src
   const scripts = document.getElementsByTagName('script');
   let root = '';
   for (const s of scripts) {
     const src = s.getAttribute('src') || '';
-    if (src.includes('jimmyg.js')) {
-      root = src.replace('_script/jimmyg.js', '');
+    if (src.includes('view.js')) {
+      root = src.replace('_script/view.js', '');
       break;
     }
   }
@@ -16,6 +16,7 @@
   // Add edit-mode styles
   const style = document.createElement('style');
   style.textContent = `
+header { display: none; }
 main .container { min-height: 50vh; }
 main .container:focus { outline: none; }
 main .container img { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
@@ -395,7 +396,7 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
   // Generate complete HTML
   function generateHTML() {
     const content = formatElement(main);
-    return '<script src="' + root + '_script/jimmyg.js"><\/script>' +
+    return '<!DOCTYPE html><script src="' + root + '_script/view.js"><\/script>' +
       '<noscript><p><a href="' + root + 'sitemap/index.html">Sitemap</a></p></noscript>' +
       content + '\n';
   }

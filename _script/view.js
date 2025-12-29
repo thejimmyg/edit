@@ -1,7 +1,11 @@
 (function() {
   const scripts = document.getElementsByTagName('script');
   const src = scripts[scripts.length - 1].getAttribute('src');
-  const root = src.replace('_script/jimmyg.js', '');
+  const expectedSuffix = '_script/view.js';
+  if (!src.endsWith(expectedSuffix)) {
+    console.error('view.js: unexpected script src "' + src + '", expected suffix "' + expectedSuffix + '"');
+  }
+  const root = src.replace(expectedSuffix, '');
   const depth = (src.match(/\.\.\//g) || []).length;
   const path = depth > 0 ? window.location.pathname.split('/').filter(p => p && p !== 'index.html').slice(-depth).join('/') : '';
   const editMode = new URLSearchParams(location.search).has('edit');
@@ -15,22 +19,31 @@
   viewport.content = 'width=device-width, initial-scale=1';
   document.head.appendChild(viewport);
 
+  // Layout constants
+  const containerMax = 1000; // px
+  const containerPad = 1; // rem
+  const galleryMax = 100; // vh
+
   // Inline styles
   const style = document.createElement('style');
   style.textContent = `
-body { margin: 0; }
-.container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-header { position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #f5f5f5; }
+body { margin: 0; background: #fafafa; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7rem; }
+.container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
+header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem; }
 header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
-header nav a, header nav span { margin-right: 0.5rem; }
-header nav a.section { font-weight: bold; }
+header .site-title { font-weight: bold; color: inherit; text-decoration: none; }
+header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
 footer { text-align: right; }
-footer .container { padding-top: 2rem; padding-bottom: 1rem; }
+footer .container { padding-top: 1rem; padding-bottom: 1rem; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; }
-.gallery { border-collapse: separate; border-spacing: 1rem; max-width: 100vh; width: 100%; margin: 0 auto; table-layout: fixed; }
-.gallery td { padding: 0; text-align: center; vertical-align: middle; }
+.gallery { border-collapse: collapse; max-width: ${galleryMax}vh; margin: 0 auto; table-layout: fixed; }
+.gallery td { padding: 0.5rem; }
+.gallery td:first-child { padding-left: 0; }
+.gallery td:last-child { padding-right: 0; }
+.gallery tr:first-child td { padding-top: 0; }
+.gallery tr:last-child td { padding-bottom: 0; }
 .gallery a { display: block; line-height: 0; }
-.gallery img { max-width: 100%; object-fit: contain; }
+.gallery img { display: block; margin: 0 auto; width: 100%; max-width: 100vh; max-height: calc(100vh - 3rem); object-fit: contain; }
 `;
   document.head.appendChild(style);
 
@@ -69,19 +82,33 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; }
       return getChildren(p).length > 0;
     }
 
-    // Leaf pages use parent as section, sections use self
-    const isLeaf = !hasChildren(path);
-    const section = isLeaf && path ? path.split('/').slice(0, -1).join('/') : path;
+    // Find nearest ancestor in sitemap (for pages not in sitemap)
+    let navPath = path;
+    while (navPath && !(navPath in sitemap)) {
+      navPath = navPath.split('/').slice(0, -1).join('/');
+    }
 
-    // Breadcrumbs: path to section
-    const crumbs = [''];
+    // Leaf pages use parent as section, sections use self
+    const isLeaf = !hasChildren(navPath);
+    const section = isLeaf && navPath ? navPath.split('/').slice(0, -1).join('/') : navPath;
+
+    // Site title (bold, links to home, uses first sitemap entry)
+    const siteTitle = document.createElement('a');
+    siteTitle.href = root + 'index.html';
+    siteTitle.className = 'site-title';
+    siteTitle.textContent = sitemap[''] || 'Home';
+
+    // Breadcrumbs: path to section (excluding root)
+    const crumbs = [];
     if (section) section.split('/').forEach((_, i, parts) => crumbs.push(parts.slice(0, i + 1).join('/')));
     const breadcrumbNav = document.createElement('nav');
-    breadcrumbNav.innerHTML = crumbs.map((p, i) => {
-      const title = sitemap[p] || p;
-      if (i === crumbs.length - 1 && !isLeaf) return '<span>' + title + '</span>';
-      return '<a href="' + root + (p ? p + '/' : '') + 'index.html">' + title + '</a>';
-    }).join('&gt; ');
+    if (crumbs.length > 0) {
+      breadcrumbNav.innerHTML = crumbs.map((p, i) => {
+        const title = sitemap[p] || p;
+        if (i === crumbs.length - 1 && !isLeaf) return '<span>' + title + '</span>';
+        return '<a href="' + root + p + '/index.html">' + title + '</a>';
+      }).join('/');
+    }
 
     // Section nav: children of section, current page as plain text
     const children = getChildren(section);
@@ -90,14 +117,16 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; }
       const title = sitemap[p];
       const isSection = hasChildren(p);
       if (p === path) return '<span>' + title + '</span>';
-      return '<a href="' + root + p + '/index.html"' + (isSection ? ' class="section"' : '') + '>' + title + '</a>';
+      const arrow = ''; //isSection ? '<span class="section-arrow">&rarr;</span>' : '';
+      return '<a href="' + root + p + '/index.html">' + title + '</a>' + arrow;
     }).join('');
 
     // Header with container
     const header = document.createElement('header');
     const headerContainer = document.createElement('div');
     headerContainer.className = 'container';
-    headerContainer.appendChild(breadcrumbNav);
+    headerContainer.appendChild(siteTitle);
+    if (crumbs.length > 0) headerContainer.appendChild(breadcrumbNav);
     headerContainer.appendChild(sectionNav);
     header.appendChild(headerContainer);
 
@@ -177,8 +206,13 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; }
               if (match) {
                 const hash = match[1];
                 const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
-                img.srcset = [300, 600, 1200, 2400].map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
-                img.sizes = '(max-width: 768px) ' + Math.floor(100 / row.length) + 'vw, 50vw';
+                // Pick smallest size >= display width * device pixel ratio
+                const sizes = [400, 800, 1600, 2400];
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                const displayWidth = Math.min(containerMax, window.innerWidth) / row.length;
+                const needed = displayWidth * dpr;
+                const size = sizes.find(s => s >= needed) || 2400;
+                img.src = base + hash + '-' + size + '.jpg';
                 // Wrap in link to highest res
                 const link = document.createElement('a');
                 link.href = base + hash + '-2400.jpg';
