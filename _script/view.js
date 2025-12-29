@@ -32,9 +32,12 @@ body { background: #fafafa; font-family: -apple-system, Helvetica, Arial, sans-s
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem;}
+header { position: sticky; top: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem;}
 header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
-header .site-title { font-weight: bold; color: inherit; text-decoration: none; }
+header .site-title { font-weight: bold; }
+header a, header a:visited, header a:hover { color: black; }
+header a, header a:visited { text-decoration: none; }
+header a:hover { text-decoration: underline; }
 header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
 footer { text-align: right; }
 footer .container { padding-top: 1rem; padding-bottom: 1rem; }
@@ -46,6 +49,7 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 .gallery td { padding: 0; margin: 0; border: 0; vertical-align: top; }
 .gallery a { display: block; padding: 0; margin: 0; border: 0; }
 .gallery img { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }
+.gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
 `;
   document.head.appendChild(style);
 
@@ -230,8 +234,62 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
         }
       }
     }
+    // Apply fit constraints to images marked tootall or toowide
+    // Uses percentage-based widths so it's responsive without resize handlers
+    function applyFitConstraints(container) {
+      const tables = container.querySelectorAll('.gallery');
+      tables.forEach(table => {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(tr => {
+          const cells = Array.from(tr.querySelectorAll('td'));
+          const images = cells.map(td => td.querySelector('img'));
+
+          images.forEach((img, idx) => {
+            if (!img) return;
+            const fit = img.dataset.fit;
+            if (fit !== 'tootall' && fit !== 'toowide') return;
+
+            // Find reference image: check left first, then wrap to right
+            let refImg = null;
+            const order = [];
+            for (let j = idx - 1; j >= 0; j--) order.push(j);
+            for (let j = idx + 1; j < images.length; j++) order.push(j);
+
+            for (const j of order) {
+              const candidate = images[j];
+              if (candidate && (!candidate.dataset.fit || candidate.dataset.fit === 'none')) {
+                refImg = candidate;
+                break;
+              }
+            }
+
+            if (!refImg) return;
+
+            // Get dimensions from data attributes
+            const refWidth = parseInt(refImg.dataset.width) || refImg.naturalWidth;
+            const refHeight = parseInt(refImg.dataset.height) || refImg.naturalHeight;
+            const imgWidth = parseInt(img.dataset.width) || img.naturalWidth;
+            const imgHeight = parseInt(img.dataset.height) || img.naturalHeight;
+
+            if (!refWidth || !refHeight || !imgWidth || !imgHeight) return;
+
+            const refAspect = refWidth / refHeight;
+            const imgAspect = imgWidth / imgHeight;
+
+            // Both tootall and toowide: crop to match reference aspect ratio
+            // tootall = portrait cropped to landscape shape
+            // toowide = landscape cropped to portrait shape
+            img.style.width = '100%';
+            img.style.aspectRatio = refAspect;
+            img.style.objectFit = 'cover';
+          });
+        });
+      });
+    }
+
     if (!editMode) {
       wrapImageRows(main);
+      applyFitConstraints(main);
     } else {
       // In edit mode, convert newlines between images to BR elements
       const children = Array.from(main.childNodes);

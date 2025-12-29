@@ -17,7 +17,7 @@
   const style = document.createElement('style');
   style.textContent = `
 header { display: none; }
-main .container { min-height: 50vh; }
+main .container { min-height: 50vh; display: block; }
 main .container:focus { outline: none; }
 main .container img { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
 main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
@@ -28,9 +28,57 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
 #edit-status { color: #080; min-width: 4rem; }
 .edit-instructions { font-size: 0.85rem; color: #666; }
 .edit-instructions kbd { background: #e0e0e0; padding: 0.1rem 0.4rem; border-radius: 3px; font-family: inherit; }
+.edit-instructions .shortcuts-full { display: inline; }
+.edit-instructions .shortcuts-link { display: none; color: #0066cc; cursor: pointer; text-decoration: underline; }
+@media (max-width: 768px) {
+  .edit-instructions .shortcuts-full { display: none; }
+  .edit-instructions .shortcuts-link { display: inline; }
+  .edit-bar { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
+  .edit-bar button { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+  .edit-bar a { padding: 0.3rem 0.4rem; }
+  .edit-bar > div { gap: 0.25rem !important; }
+}
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
+main .container img[data-fit="toowide"] { outline: 3px solid #e67300; }
+main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
+.fit-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
+.fit-label.toowide { background: rgba(230, 115, 0, 0.85); color: white; }
+.fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
 `;
   document.head.appendChild(style);
+
+  // Create overlay container for fit labels (outside contentEditable)
+  const fitLabelOverlay = document.createElement('div');
+  fitLabelOverlay.style.cssText = 'position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100;';
+  document.body.appendChild(fitLabelOverlay);
+
+  // Update fit labels on all images
+  function updateFitLabels() {
+    // Remove existing labels
+    fitLabelOverlay.innerHTML = '';
+
+    // Add labels for images with data-fit
+    main.querySelectorAll('img[data-fit]').forEach(img => {
+      const fit = img.dataset.fit;
+      if (fit === 'toowide' || fit === 'tootall') {
+        const label = document.createElement('span');
+        label.className = 'fit-label ' + fit;
+        label.textContent = fit;
+
+        // Position the label over the image using fixed positioning
+        const rect = img.getBoundingClientRect();
+        label.style.left = (rect.left + 4) + 'px';
+        label.style.top = (rect.top + 4) + 'px';
+
+        fitLabelOverlay.appendChild(label);
+      }
+    });
+  }
+
+  // Update labels on scroll/resize and initially
+  window.addEventListener('scroll', updateFitLabels);
+  window.addEventListener('resize', updateFitLabels);
+  setTimeout(updateFitLabels, 100);
 
   // Make main editable
   main.contentEditable = 'true';
@@ -41,24 +89,34 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
   bar.className = 'edit-bar';
   bar.innerHTML = `
     <div class="edit-instructions">
-      Drag and Drop images
-      <kbd>Ctrl+2/3/4</kbd> Heading
-      <kbd>Ctrl+0</kbd> Paragraph
-      <kbd>Ctrl+L</kbd> List
-      <kbd>Tab</kbd> Indent
-      <kbd>Ctrl+K</kbd> Link
-      <kbd>Ctrl+B</kbd> Bold
-      <kbd>Ctrl+I</kbd> Italic/Alt
+      <span class="shortcuts-full">
+        Drag and Drop images
+        <kbd>Ctrl+2/3/4</kbd> Heading
+        <kbd>Ctrl+0</kbd> Paragraph
+        <kbd>Ctrl+L</kbd> List
+        <kbd>Tab</kbd> Indent
+        <kbd>Ctrl+K</kbd> Link
+        <kbd>Ctrl+B</kbd> Bold
+        <kbd>Ctrl+I</kbd> Italic/Alt
+        <kbd>Ctrl+J</kbd> Fit
+      </span>
+      <span class="shortcuts-link" id="shortcuts-link">Shortcuts</span>
     </div>
     <div style="display:flex;align-items:center;gap:0.5rem">
       <span id="edit-status"></span>
-      <button id="edit-copy">Copy HTML</button>
+      <button id="edit-copy">Copy</button>
       ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
       <a id="edit-download" href="#" download="index.html">Download</a>
       <a href="${location.pathname}">View</a>
     </div>
   `;
   document.body.appendChild(bar);
+
+  // Mobile shortcuts link click handler
+  document.getElementById('shortcuts-link').addEventListener('click', () => {
+    const text = document.querySelector('.shortcuts-full').textContent.trim().replace(/\s+/g, ' ');
+    alert(text);
+  });
 
   // Add padding to body so content isn't hidden behind bar
   document.body.style.paddingBottom = '4rem';
@@ -142,6 +200,41 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
         } else if (text) {
           // Text selected: apply italic/em
           document.execCommand('italic');
+        }
+      }
+      // Ctrl+J for image fit mode toggle
+      if (key === 'j') {
+        e.preventDefault();
+        const selection = window.getSelection();
+
+        // Check if an image is selected
+        let img = null;
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (range.startContainer === range.endContainer &&
+              range.startContainer.nodeType === Node.ELEMENT_NODE &&
+              range.endOffset - range.startOffset === 1) {
+            const selectedNode = range.startContainer.childNodes[range.startOffset];
+            if (selectedNode && selectedNode.nodeName === 'IMG') {
+              img = selectedNode;
+            }
+          }
+        }
+
+        if (img) {
+          // Cycle through fit modes: none -> toowide -> tootall -> none
+          const currentFit = img.dataset.fit || 'none';
+          const fitModes = ['none', 'toowide', 'tootall'];
+          const currentIndex = fitModes.indexOf(currentFit);
+          const nextIndex = (currentIndex + 1) % fitModes.length;
+          const nextFit = fitModes[nextIndex];
+
+          if (nextFit === 'none') {
+            delete img.dataset.fit;
+          } else {
+            img.dataset.fit = nextFit;
+          }
+          updateFitLabels();
         }
       }
     }
@@ -259,6 +352,7 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
     }
     let tag = '<img src="' + src + '"';
     if (node.alt) tag += ' alt="' + node.alt.replace(/"/g, '&quot;') + '"';
+    if (node.dataset.fit) tag += ' data-fit="' + node.dataset.fit + '"';
     if (node.dataset.width) tag += ' data-width="' + node.dataset.width + '"';
     if (node.dataset.height) tag += ' data-height="' + node.dataset.height + '"';
     tag += '>';
