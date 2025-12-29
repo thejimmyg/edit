@@ -53,7 +53,8 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
     <div style="display:flex;align-items:center;gap:0.5rem">
       <span id="edit-status"></span>
       <button id="edit-copy">Copy HTML</button>
-      <a id="edit-save" href="#" download="index.html">Save</a>
+      ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
+      <a id="edit-download" href="#" download="index.html">Download</a>
       <a href="${location.pathname}">View</a>
     </div>
   `;
@@ -415,16 +416,42 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
     }
   });
 
-  // Save link - update href on hover so right-click "Save As" works
-  const saveLink = document.getElementById('edit-save');
+  // Download link - update href on hover so right-click "Save As" works
+  const downloadLink = document.getElementById('edit-download');
   let blobUrl = null;
 
-  saveLink.addEventListener('mouseenter', () => {
+  downloadLink.addEventListener('mouseenter', () => {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     const html = generateHTML();
     const blob = new Blob([html], { type: 'text/html' });
     blobUrl = URL.createObjectURL(blob);
-    saveLink.href = blobUrl;
+    downloadLink.href = blobUrl;
   });
+
+  // Save button - POST to server (only exists when not file://)
+  const saveBtn = document.getElementById('edit-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const html = generateHTML();
+      const status = document.getElementById('edit-status');
+      try {
+        const response = await fetch(location.pathname, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html' },
+          body: html
+        });
+        if (response.ok) {
+          status.textContent = 'Saved';
+          setTimeout(() => status.textContent = '', 2000);
+        } else {
+          throw new Error(response.statusText);
+        }
+      } catch (err) {
+        status.textContent = 'Error';
+        console.error('Save failed:', err);
+        setTimeout(() => status.textContent = '', 2000);
+      }
+    });
+  }
 
 })();

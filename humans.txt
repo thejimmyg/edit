@@ -86,10 +86,26 @@ view.js uses to build the gallery table.
 
 Saving:
   "Copy HTML" - copies formatted HTML to clipboard via navigator.clipboard API
-  "Save" - creates a Blob with text/html content, generates a temporary URL
-           via URL.createObjectURL(), triggers download via anchor click.
-           Right-click and "Save As" to choose location.
+  "Save" - (server mode only) POSTs the HTML to the server, which writes it
+           directly to the file. Only appears when served via HTTP.
+  "Download" - creates a Blob with text/html content, generates a temporary URL
+               via URL.createObjectURL(), triggers download via anchor click.
+               Right-click and "Save As" to choose location.
   "View" - exits edit mode (navigates to page without ?edit)
+
+/* DEVELOPMENT SERVER */
+
+Run `make serve` to start the development server. This uses serve.py, a simple
+Python HTTP server that serves static files and handles POST requests to save
+edited pages directly to disk.
+
+The server:
+  - Binds to 0.0.0.0:8000 (accessible from other devices on the network)
+  - Serves static files like Python's built-in http.server
+  - Accepts POST to any /path/index.html and writes the body to that file
+  - Redirects back to the page after saving
+
+serve.py is intentionally minimal and readable - see the source for details.
 
 /* IMAGE GALLERIES */
 
