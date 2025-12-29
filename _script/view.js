@@ -21,17 +21,18 @@
 
   // Layout constants
   const containerMax = 1000; // px
-  const containerPad = 0.5; // rem
+  const containerPad = 0.6; // rem
   const galleryMax = 100; // vh
 
   // Inline styles
   const style = document.createElement('style');
   style.textContent = `
-body { margin: 0; background: #fafafa; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.7rem; }
+html, body { margin: 0; padding: 0; }
+body { background: #fafafa; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem; }
+header { position: sticky; top: 0; background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem;}
 header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
 header .site-title { font-weight: bold; color: inherit; text-decoration: none; }
 header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
@@ -39,9 +40,9 @@ footer { text-align: right; }
 footer .container { padding-top: 1rem; padding-bottom: 1rem; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
 main .container > *:not(.gallery) { align-self: stretch; }
-main .container > p { margin: 0; padding:0  }
+main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 .gallery { padding-top: 0.5rem; padding-bottom: 0.5rem }
-.gallery { table-layout: fixed; max-width: calc(100% +  ${containerPad * 2}rem); width: calc(120vh + ${containerPad * 2}rem); border-spacing: ${containerPad}rem; margin: -${containerPad}rem -${containerPad}rem 0 -${containerPad}rem; }
+.gallery { table-layout: fixed; width: 100%; width: min(105vh, calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: -${containerPad}rem -cacl(2*${containerPad}rem) 0 -${containerPad}rem; }
 .gallery td { padding: 0; margin: 0; border: 0; vertical-align: top; }
 .gallery a { display: block; padding: 0; margin: 0; border: 0; }
 .gallery img { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }

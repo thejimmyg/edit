@@ -52,9 +52,10 @@ class SaveHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-    server = HTTPServer(('0.0.0.0', port), SaveHandler)
-    print(f'Serving on 0.0.0.0:{port}')
+    host = sys.argv[1] if len(sys.argv) > 1 else '0.0.0.0'
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
+    server = HTTPServer((host, port), SaveHandler)
+    print(f'Serving on {host}:{port}')
     try:
         server.serve_forever()
     except KeyboardInterrupt:

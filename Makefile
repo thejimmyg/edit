@@ -7,7 +7,7 @@ all: sitemap index gallery
 
 serve: sitemap
 	ip addr | grep inet
-	python3 serve.py
+	python3 serve.py 10.228.1.226
 
 sitemap: _script/sitemap.js
 
