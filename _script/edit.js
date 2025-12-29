@@ -1,5 +1,5 @@
 (function() {
-  const main = document.querySelector('main');
+  const main = document.querySelector('main .container');
   if (!main) return;
 
   // Get root path from the jimmyg.js script src
@@ -16,10 +16,10 @@
   // Add edit-mode styles
   const style = document.createElement('style');
   style.textContent = `
-main { min-height: 50vh; }
-main:focus { outline: none; }
-main img { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
-main img.pending { opacity: 0.6; border: 2px dashed #999; }
+main .container { min-height: 50vh; }
+main .container:focus { outline: none; }
+main .container img { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
+main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
 .edit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #f5f5f5; border-top: 1px solid #ccc; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
 .edit-bar button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
 .edit-bar button:hover { background: #e0e0e0; }
@@ -34,6 +34,7 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
   // Make main editable
   main.contentEditable = 'true';
 
+
   // Create bottom bar with instructions and save button
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
@@ -45,7 +46,8 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       <kbd>Ctrl+L</kbd> List
       <kbd>Tab</kbd> Indent
       <kbd>Ctrl+K</kbd> Link
-      <kbd>Ctrl+I</kbd> Alt
+      <kbd>Ctrl+B</kbd> Bold
+      <kbd>Ctrl+I</kbd> Italic/Alt
     </div>
     <div style="display:flex;align-items:center;gap:0.5rem">
       <span id="edit-status"></span>
@@ -84,6 +86,11 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
           }
           node = node.parentNode;
         }
+        // Require text selection unless already in a link
+        if (!text && !existingHref) {
+          alert('Please select some text first');
+          return;
+        }
         const url = prompt('Link URL:', existingHref);
         if (url !== null) {
           if (url === '') {
@@ -98,34 +105,41 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
         e.preventDefault();
         document.execCommand('insertUnorderedList');
       }
-    }
-    // Ctrl+I for image alt text
-    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'i') {
-      e.preventDefault();
-      const selection = window.getSelection();
-      let node = selection.anchorNode;
-      let img = null;
-      // Check if selection is on or near an image
-      if (node && node.nodeName === 'IMG') {
-        img = node;
-      } else if (node) {
-        // Check siblings and parent's children for nearby image
-        const parent = node.parentNode;
-        if (parent) {
-          // Check if previous or next sibling is an image
-          if (node.previousSibling && node.previousSibling.nodeName === 'IMG') {
-            img = node.previousSibling;
-          } else if (node.nextSibling && node.nextSibling.nodeName === 'IMG') {
-            img = node.nextSibling;
-          } else if (parent.nodeName === 'IMG') {
-            img = parent;
+      // Ctrl+B for bold/strong
+      if (key === 'b') {
+        e.preventDefault();
+        document.execCommand('bold');
+      }
+      // Ctrl+I for italic/em or image alt text
+      // Selection API: text selection has toString(), image selection brackets the node
+      if (key === 'i') {
+        e.preventDefault();
+        const selection = window.getSelection();
+        const text = selection.toString();
+
+        // Check if an image is selected (range brackets exactly one element node)
+        let img = null;
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (range.startContainer === range.endContainer &&
+              range.startContainer.nodeType === Node.ELEMENT_NODE &&
+              range.endOffset - range.startOffset === 1) {
+            const selectedNode = range.startContainer.childNodes[range.startOffset];
+            if (selectedNode && selectedNode.nodeName === 'IMG') {
+              img = selectedNode;
+            }
           }
         }
-      }
-      if (img) {
-        const alt = prompt('Image alt text:', img.alt || '');
-        if (alt !== null) {
-          img.alt = alt;
+
+        if (img) {
+          // Image selected: edit alt text
+          const alt = prompt('Image alt text:', img.alt || '');
+          if (alt !== null) {
+            img.alt = alt;
+          }
+        } else if (text) {
+          // Text selected: apply italic/em
+          document.execCommand('italic');
         }
       }
     }
@@ -249,7 +263,7 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
     return tag;
   }
 
-  // Get inline content (text, links, images) from an element
+  // Get inline content (text, links, images, strong, em) from an element
   function inlineContent(el) {
     let result = '';
     for (const node of el.childNodes) {
@@ -258,7 +272,11 @@ main img.pending { opacity: 0.6; border: 2px dashed #999; }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const tag = node.tagName.toLowerCase();
         if (tag === 'a') {
-          result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
+          result += '<a href="' + (node.getAttribute('href') || '') + '">' + inlineContent(node) + '</a>';
+        } else if (tag === 'strong' || tag === 'b') {
+          result += '<strong>' + inlineContent(node) + '</strong>';
+        } else if (tag === 'em' || tag === 'i') {
+          result += '<em>' + inlineContent(node) + '</em>';
         } else if (tag === 'img') {
           result += imgTag(node);
         } else if (tag === 'br') {

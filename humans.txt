@@ -53,6 +53,7 @@ To create a new page:
 /* EDITING */
 
 Ctrl+E or ?edit enters edit mode. Content becomes editable in the browser.
+The footer is hidden and content is constrained to max 1000px width.
 
 Keyboard shortcuts:
   Ctrl+2/3/4  Heading levels
@@ -60,12 +61,29 @@ Keyboard shortcuts:
   Ctrl+L      Bulleted list
   Tab         Indent list item
   Shift+Tab   Dedent list item
-  Ctrl+K      Add/edit link (prompt for URL, empty to remove)
+  Ctrl+K      Add/edit link (select text first, prompt for URL, empty to remove)
+  Ctrl+B      Bold/strong (select text first)
+  Ctrl+I      Italic/em (text selected) or image alt text (image selected)
 
-Drag images onto page to insert. Images are referenced by SHA256 hash
-(first 12 chars) as _gallery/HASH.jpg.
+Selection in JS: Text selection returns content via selection.toString().
+Image selection brackets the element within its parent - the range's
+startContainer equals endContainer, and endOffset - startOffset equals 1,
+with the image at childNodes[startOffset].
 
-Click "Copy HTML" then paste into editor. Click "View" to exit edit mode.
+Drag and drop images onto page to insert. Images show as previews and are
+referenced by SHA256 hash (first 12 chars) as _gallery/HASH.jpg. Image
+dimensions are stored as data-width and data-height attributes.
+
+Image rows: Images on the same line form a gallery row. Press Enter between
+images to create separate rows. The saved HTML preserves line breaks which
+jimmyg.js uses to build the gallery table.
+
+Saving:
+  "Copy HTML" - copies formatted HTML to clipboard via navigator.clipboard API
+  "Save" - creates a Blob with text/html content, generates a temporary URL
+           via URL.createObjectURL(), triggers download via anchor click.
+           Right-click and "Save As" to choose location.
+  "View" - exits edit mode (navigates to page without ?edit)
 
 /* IMAGE GALLERIES */
 

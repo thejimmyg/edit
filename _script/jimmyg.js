@@ -18,16 +18,19 @@
   // Inline styles
   const style = document.createElement('style');
   style.textContent = `
-body { margin: 0; padding: 0 1rem; }
-header { position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #f5f5f5; padding: 0.5rem 1rem; margin: 0 -1rem; display: flex; gap: 1rem; }
+body { margin: 0; }
+.container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+header { position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #f5f5f5; }
+header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
 header nav a, header nav span { margin-right: 0.5rem; }
 header nav a.section { font-weight: bold; }
-footer { text-align: right; padding: 2rem 0 1rem; }
-main { padding: 1rem 0; }
-.gallery { border-collapse: separate; border-spacing: 1rem; max-width: 100vh; width: 100%; margin-left: -1rem; table-layout: fixed; }
+footer { text-align: right; }
+footer .container { padding-top: 2rem; padding-bottom: 1rem; }
+main .container { padding-top: 1rem; padding-bottom: 1rem; }
+.gallery { border-collapse: separate; border-spacing: 1rem; max-width: 100vh; width: 100%; margin: 0 auto; table-layout: fixed; }
 .gallery td { padding: 0; text-align: center; vertical-align: middle; }
 .gallery a { display: block; line-height: 0; }
-.gallery img {max-width: 100%; object-fit: contain; }
+.gallery img { max-width: 100%; object-fit: contain; }
 `;
   document.head.appendChild(style);
 
@@ -90,18 +93,24 @@ main { padding: 1rem 0; }
       return '<a href="' + root + p + '/index.html"' + (isSection ? ' class="section"' : '') + '>' + title + '</a>';
     }).join('');
 
-    // Header
+    // Header with container
     const header = document.createElement('header');
-    header.appendChild(breadcrumbNav);
-    header.appendChild(sectionNav);
+    const headerContainer = document.createElement('div');
+    headerContainer.className = 'container';
+    headerContainer.appendChild(breadcrumbNav);
+    headerContainer.appendChild(sectionNav);
+    header.appendChild(headerContainer);
 
-    // Footer with Top link (hidden initially)
+    // Footer with container and Top link (hidden initially)
     const footer = document.createElement('footer');
+    const footerContainer = document.createElement('div');
+    footerContainer.className = 'container';
     const topLink = document.createElement('a');
     topLink.href = '#';
-    topLink.textContent = 'Top';
+    topLink.textContent = 'Top \u2191';
     topLink.style.display = 'none';
-    footer.appendChild(topLink);
+    footerContainer.appendChild(topLink);
+    footer.appendChild(footerContainer);
 
     // Show/hide Top link based on scroll
     function updateTopLink() {
@@ -163,10 +172,11 @@ main { padding: 1rem 0; }
               tr.appendChild(td);
 
               // Add srcset and link for gallery images
-              const match = img.src.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
+              const srcAttr = img.getAttribute('src') || '';
+              const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
               if (match) {
                 const hash = match[1];
-                const base = img.src.replace(/[a-f0-9]{12}\.jpg$/, '');
+                const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
                 img.srcset = [300, 600, 1200, 2400].map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
                 img.sizes = '(max-width: 768px) ' + Math.floor(100 / row.length) + 'vw, 50vw';
                 // Wrap in link to highest res
@@ -203,11 +213,17 @@ main { padding: 1rem 0; }
       }
     }
 
+    // Wrap main content in container
+    const mainContainer = document.createElement('div');
+    mainContainer.className = 'container';
+    while (main.firstChild) mainContainer.appendChild(main.firstChild);
+    main.appendChild(mainContainer);
+
     // Assemble
     document.body.innerHTML = '';
     document.body.appendChild(header);
     document.body.appendChild(main);
-    document.body.appendChild(footer);
+    if (!editMode) document.body.appendChild(footer);
 
     updateTopLink();
 
