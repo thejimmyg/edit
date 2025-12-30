@@ -69,20 +69,34 @@ Keyboard shortcuts:
   Shift+Tab   Dedent list item
   Ctrl+K      Add/edit link (select text first, prompt for URL, empty to remove)
   Ctrl+B      Bold/strong (select text first)
-  Ctrl+I      Italic/em (text selected) or image alt text (image selected)
+  Ctrl+I      Italic/em (text selected) or alt text (image/video selected)
+
+Ctrl+J      Cycle fit mode (image/video selected): none -> toowide -> tootall
 
 Selection in JS: Text selection returns content via selection.toString().
-Image selection brackets the element within its parent - the range's
+Media selection brackets the element within its parent - the range's
 startContainer equals endContainer, and endOffset - startOffset equals 1,
-with the image at childNodes[startOffset].
+with the media at childNodes[startOffset].
 
-Drag and drop images onto page to insert. Images show as previews and are
-referenced by SHA256 hash (first 12 chars) as _gallery/HASH.jpg. Image
-dimensions are stored as data-width and data-height attributes.
+Videos in edit mode have no controls (static preview like images). Click to
+select, then use Ctrl+I for alt text or Ctrl+J for fit mode. Use View mode
+to preview playback.
 
-Image rows: Images on the same line form a gallery row. Press Enter between
-images to create separate rows. The saved HTML preserves line breaks which
-view.js uses to build the gallery table.
+Drag and drop images or videos onto page to insert. Media shows as previews
+and is referenced by SHA256 hash (first 12 chars):
+  - Images: _gallery/HASH.jpg
+  - Videos: _gallery/HASH.mp4 with poster="_gallery/HASH-poster.jpg"
+
+Dimensions stored as data-width and data-height. Videos also store
+data-duration (in seconds).
+
+Note: Drag-and-drop uses crypto.subtle for hashing, which requires a secure
+context (localhost or HTTPS). Access via IP address over HTTP won't work.
+
+Gallery rows: Images and videos on the same line form a gallery row. Press
+Enter between media to create separate rows. The saved HTML preserves line
+breaks which view.js uses to build the gallery table. Mixed rows of images
+and videos are supported.
 
 Saving:
   "Copy HTML" - copies formatted HTML to clipboard via navigator.clipboard API
@@ -107,24 +121,62 @@ The server:
 
 serve.py is intentionally minimal and readable - see the source for details.
 
-/* IMAGE GALLERIES */
+/* MEDIA GALLERIES */
 
-Consecutive <img> tags form a row. The script wraps them in a flex container
-with equal widths. Separate rows with any block element (p, h2, etc).
+Consecutive <img> and <video> tags form a row. The script wraps them in a
+table with equal-width columns. Separate rows with any block element (p, h2,
+etc) or line breaks in the source HTML. Images and videos can be mixed in
+the same row.
 
-/* IMAGE PROCESSING */
+/* MEDIA PROCESSING */
 
-Images are content-addressed by SHA256 hash. Workflow:
+Images and videos are content-addressed by SHA256 hash. Workflow:
 
-  1. `make index`   - scans ~/Pictures, builds ~/.cache/picture-index
-  2. Drag images in edit mode - computes hash, inserts _gallery/HASH.jpg
-  3. `make gallery` - finds hashes in HTML, generates thumbnails from index
+  1. `make index`   - scans ~/Pictures for images and videos, builds
+                      ~/.cache/picture-index (hash → filepath mapping)
+  2. Drag media in edit mode - computes hash, inserts reference
+  3. `make gallery` - finds image hashes in HTML, generates sizes from index
+  4. `make videos`  - finds video hashes in HTML, transcodes from index
 
-Generates multiple sizes; HASH.jpg symlinks to a mid-size as no-JS fallback.
-See Makefile for sizes and compression settings. Requires ImageMagick.
+`make` or `make all` runs: sitemap, index, gallery, videos
 
-view.js picks the appropriate size based on display width × device pixel
-ratio (capped at 2x), so mobile gets smaller files while retina stays sharp.
+Cleanup targets:
+  `make unused`        - delete files with unreferenced hashes and obsolete
+                         size variants (e.g., old 480p/720p after changing sizes)
+  `make clean-symlinks` - delete symlinks so they can be recreated with
+                         current default sizes (run gallery/videos after)
+
+Image formats indexed: jpg, jpeg, png, gif, webp, heic, heif
+Video formats indexed: mp4, mov, mkv, webm, avi
+
+Image output (requires ImageMagick):
+  - Sizes: 400, 800, 1600, 2400 pixels (longest edge)
+  - HASH.jpg symlinks to HASH-800.jpg as default
+  - Auto-orient, sharpen, strip metadata, progressive JPEG at quality 75
+
+Video output (requires ffmpeg):
+  - Resolutions: 360p, 540p (height-based scaling, width auto)
+  - Codec: H.264 (main profile, level 4.0), AAC audio at 96kbps
+  - Quality: CRF 26 (good balance of size/quality for web)
+  - Uses -movflags +faststart for Safari streaming (moov atom at start)
+  - HASH.mp4 symlinks to HASH-540p.mp4 as default
+  - HASH-poster.jpg extracted from first frame
+
+view.js handles responsive sizing differently for images and videos:
+
+  Images: Uses srcset and sizes attributes. The browser chooses the best size
+  based on display width and device pixel ratio. srcset lists all available
+  widths (400w, 800w, 1600w, 2400w), sizes is set to container width / items
+  per row. Fallback src is the 800px version.
+
+  Videos: JavaScript selection at page load. No srcset equivalent exists for
+  video, so src is rewritten directly. Selection logic:
+    - Gallery videos: 540p if display width > 400px, else 360p
+      (display width = min(1000, viewport) / items per row)
+    - Standalone videos: 540p if viewport > 500px, else 360p
+
+Videos not in gallery tables (e.g., inline in paragraphs) are constrained
+to max-width: 100% via CSS and still get resolution selection applied.
 
 /* NO-JS FALLBACK */
 

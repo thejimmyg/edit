@@ -28,11 +28,11 @@
   const style = document.createElement('style');
   style.textContent = `
 html, body { margin: 0; padding: 0; }
-body { background: #fafafa; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
+body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #efefef; line-height: 2rem; font-size: 0.8rem;}
+header { position: sticky; top: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem;}
 header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
@@ -44,12 +44,14 @@ footer .container { padding-top: 1rem; padding-bottom: 1rem; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
+main .container video { max-width: 100%; height: auto; }
 .gallery { padding-top: 0.5rem; padding-bottom: 0.5rem }
 .gallery { table-layout: fixed; width: 100%; width: min(105vh, calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: -${containerPad}rem -cacl(2*${containerPad}rem) 0 -${containerPad}rem; }
 .gallery td { padding: 0; margin: 0; border: 0; vertical-align: top; }
 .gallery a { display: block; padding: 0; margin: 0; border: 0; }
-.gallery img { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }
+.gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }
 .gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
+.gallery video { cursor: pointer; }
 `;
   document.head.appendChild(style);
 
@@ -156,8 +158,13 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
     window.addEventListener('scroll', updateTopLink);
     window.addEventListener('resize', updateTopLink);
 
-    // Wrap consecutive images in gallery table rows and add srcset
-    function wrapImageRows(container) {
+    // Check if node is media (image or video)
+    function isMedia(node) {
+      return node.nodeName === 'IMG' || node.nodeName === 'VIDEO';
+    }
+
+    // Wrap consecutive images/videos in gallery table rows and add srcset
+    function wrapMediaRows(container) {
       const children = Array.from(container.childNodes);
       let i = 0;
 
@@ -168,13 +175,13 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 
       while (i < children.length) {
         const node = children[i];
-        if (node.nodeName === 'IMG') {
-          // Collect all consecutive image rows (separated by non-IMG nodes that are whitespace-only text)
+        if (isMedia(node)) {
+          // Collect all consecutive media rows (separated by non-media nodes that are whitespace-only text)
           const rows = [];
           while (i < children.length) {
-            if (children[i].nodeName === 'IMG') {
+            if (isMedia(children[i])) {
               const row = [];
-              while (i < children.length && children[i].nodeName === 'IMG') {
+              while (i < children.length && isMedia(children[i])) {
                 row.push(children[i]);
                 i++;
               }
@@ -182,7 +189,7 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
             } else if (children[i].nodeType === Node.TEXT_NODE && !children[i].textContent.trim()) {
               i++; // Skip whitespace
             } else {
-              break; // Non-image, non-whitespace content ends the table
+              break; // Non-media, non-whitespace content ends the table
             }
           }
 
@@ -201,31 +208,45 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
             table.appendChild(tr);
             const colspan = cols / row.length;
 
-            for (const img of row) {
+            for (const media of row) {
               const td = document.createElement('td');
               td.colSpan = colspan;
               tr.appendChild(td);
 
-              // Add srcset and link for gallery images
-              const srcAttr = img.getAttribute('src') || '';
-              const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
-              if (match) {
-                const hash = match[1];
-                const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
-                // Pick smallest size >= display width * device pixel ratio
-                const sizes = [400, 800, 1600, 2400];
-                const dpr = Math.min(window.devicePixelRatio || 1, 2);
-                const displayWidth = Math.min(containerMax, window.innerWidth) / row.length;
-                const needed = displayWidth * dpr;
-                const size = sizes.find(s => s >= needed) || 2400;
-                img.src = base + hash + '-' + size + '.jpg';
-                // Wrap in link to highest res
-                const link = document.createElement('a');
-                link.href = base + hash + '-2400.jpg';
-                link.appendChild(img);
-                td.appendChild(link);
-              } else {
-                td.appendChild(img);
+              if (media.nodeName === 'IMG') {
+                // Add srcset for gallery images - let browser choose size
+                const srcAttr = media.getAttribute('src') || '';
+                const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
+                if (match) {
+                  const hash = match[1];
+                  const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
+                  const sizes = [400, 800, 1600, 2400];
+                  media.src = base + hash + '-800.jpg';
+                  media.srcset = sizes.map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
+                  media.sizes = Math.round(containerMax / row.length) + 'px';
+                  // Wrap in link to highest res
+                  const link = document.createElement('a');
+                  link.href = base + hash + '-2400.jpg';
+                  link.appendChild(media);
+                  td.appendChild(link);
+                } else {
+                  td.appendChild(media);
+                }
+              } else if (media.nodeName === 'VIDEO') {
+                // Handle gallery videos
+                const srcAttr = media.getAttribute('src') || '';
+                const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.mp4$/);
+                if (match) {
+                  const hash = match[1];
+                  const base = srcAttr.replace(/[a-f0-9]{12}\.mp4$/, '');
+                  // Pick 360p or 540p based on display width
+                  const displayWidth = Math.min(containerMax, window.innerWidth) / row.length;
+                  const size = displayWidth > 400 ? 540 : 360;
+                  media.src = base + hash + '-' + size + 'p.mp4';
+                  // Add controls attribute
+                  media.controls = true;
+                }
+                td.appendChild(media);
               }
             }
           }
@@ -234,7 +255,7 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
         }
       }
     }
-    // Apply fit constraints to images marked tootall or toowide
+    // Apply fit constraints to media marked tootall or toowide
     // Uses percentage-based widths so it's responsive without resize handlers
     function applyFitConstraints(container) {
       const tables = container.querySelectorAll('.gallery');
@@ -242,64 +263,80 @@ main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
         const rows = table.querySelectorAll('tr');
         rows.forEach(tr => {
           const cells = Array.from(tr.querySelectorAll('td'));
-          const images = cells.map(td => td.querySelector('img'));
+          const mediaList = cells.map(td => td.querySelector('img') || td.querySelector('video'));
 
-          images.forEach((img, idx) => {
-            if (!img) return;
-            const fit = img.dataset.fit;
+          mediaList.forEach((media, idx) => {
+            if (!media) return;
+            const fit = media.dataset.fit;
             if (fit !== 'tootall' && fit !== 'toowide') return;
 
-            // Find reference image: check left first, then wrap to right
-            let refImg = null;
+            // Find reference media: check left first, then wrap to right
+            let refMedia = null;
             const order = [];
             for (let j = idx - 1; j >= 0; j--) order.push(j);
-            for (let j = idx + 1; j < images.length; j++) order.push(j);
+            for (let j = idx + 1; j < mediaList.length; j++) order.push(j);
 
             for (const j of order) {
-              const candidate = images[j];
+              const candidate = mediaList[j];
               if (candidate && (!candidate.dataset.fit || candidate.dataset.fit === 'none')) {
-                refImg = candidate;
+                refMedia = candidate;
                 break;
               }
             }
 
-            if (!refImg) return;
+            if (!refMedia) return;
 
-            // Get dimensions from data attributes
-            const refWidth = parseInt(refImg.dataset.width) || refImg.naturalWidth;
-            const refHeight = parseInt(refImg.dataset.height) || refImg.naturalHeight;
-            const imgWidth = parseInt(img.dataset.width) || img.naturalWidth;
-            const imgHeight = parseInt(img.dataset.height) || img.naturalHeight;
+            // Get dimensions from data attributes (videos use videoWidth/videoHeight)
+            const refWidth = parseInt(refMedia.dataset.width) || refMedia.naturalWidth || refMedia.videoWidth;
+            const refHeight = parseInt(refMedia.dataset.height) || refMedia.naturalHeight || refMedia.videoHeight;
+            const mediaWidth = parseInt(media.dataset.width) || media.naturalWidth || media.videoWidth;
+            const mediaHeight = parseInt(media.dataset.height) || media.naturalHeight || media.videoHeight;
 
-            if (!refWidth || !refHeight || !imgWidth || !imgHeight) return;
+            if (!refWidth || !refHeight || !mediaWidth || !mediaHeight) return;
 
             const refAspect = refWidth / refHeight;
-            const imgAspect = imgWidth / imgHeight;
 
             // Both tootall and toowide: crop to match reference aspect ratio
             // tootall = portrait cropped to landscape shape
             // toowide = landscape cropped to portrait shape
-            img.style.width = '100%';
-            img.style.aspectRatio = refAspect;
-            img.style.objectFit = 'cover';
+            media.style.width = '100%';
+            media.style.aspectRatio = refAspect;
+            media.style.objectFit = 'cover';
           });
         });
       });
     }
 
+    // Select appropriate video resolution based on viewport
+    function selectVideoResolution(container) {
+      container.querySelectorAll('video').forEach(video => {
+        const srcAttr = video.getAttribute('src') || '';
+        const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.mp4$/);
+        if (match) {
+          const hash = match[1];
+          const base = srcAttr.replace(/[a-f0-9]{12}\.mp4$/, '');
+          // Pick 360p or 540p based on viewport width
+          const size = window.innerWidth > 500 ? 540 : 360;
+          video.src = base + hash + '-' + size + 'p.mp4';
+          video.controls = true;
+        }
+      });
+    }
+
     if (!editMode) {
-      wrapImageRows(main);
+      selectVideoResolution(main);
+      wrapMediaRows(main);
       applyFitConstraints(main);
     } else {
-      // In edit mode, convert newlines between images to BR elements
+      // In edit mode, convert newlines between media to BR elements
       const children = Array.from(main.childNodes);
       for (let i = 0; i < children.length; i++) {
         const node = children[i];
         if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('\n')) {
-          // Check if between images
+          // Check if between media elements
           const prev = children[i - 1];
           const next = children[i + 1];
-          if ((prev && prev.nodeName === 'IMG') || (next && next.nodeName === 'IMG')) {
+          if ((prev && isMedia(prev)) || (next && isMedia(next))) {
             const br = document.createElement('br');
             node.parentNode.replaceChild(br, node);
           }

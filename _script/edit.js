@@ -19,8 +19,8 @@
 header { display: none; }
 main .container { min-height: 50vh; display: block; }
 main .container:focus { outline: none; }
-main .container img { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
-main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
+main .container img, main .container video { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
+main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
 .edit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #f5f5f5; border-top: 1px solid #ccc; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
 .edit-bar button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
 .edit-bar button:hover { background: #e0e0e0; }
@@ -39,8 +39,9 @@ main .container img.pending { opacity: 0.6; border: 2px dashed #999; }
   .edit-bar > div { gap: 0.25rem !important; }
 }
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
-main .container img[data-fit="toowide"] { outline: 3px solid #e67300; }
-main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
+main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
+main .container img[data-fit="tootall"], main .container video[data-fit="tootall"] { outline: 3px solid #0066cc; }
+.video-select-overlay { position: absolute; background: rgba(0,102,204,0.3); pointer-events: none; z-index: 50; }
 .fit-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
 .fit-label.toowide { background: rgba(230, 115, 0, 0.85); color: white; }
 .fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
@@ -52,21 +53,21 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
   fitLabelOverlay.style.cssText = 'position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100;';
   document.body.appendChild(fitLabelOverlay);
 
-  // Update fit labels on all images
+  // Update fit labels on all images and videos
   function updateFitLabels() {
     // Remove existing labels
     fitLabelOverlay.innerHTML = '';
 
-    // Add labels for images with data-fit
-    main.querySelectorAll('img[data-fit]').forEach(img => {
-      const fit = img.dataset.fit;
+    // Add labels for media with data-fit
+    main.querySelectorAll('img[data-fit], video[data-fit]').forEach(media => {
+      const fit = media.dataset.fit;
       if (fit === 'toowide' || fit === 'tootall') {
         const label = document.createElement('span');
         label.className = 'fit-label ' + fit;
         label.textContent = fit;
 
-        // Position the label over the image using fixed positioning
-        const rect = img.getBoundingClientRect();
+        // Position the label over the media using fixed positioning
+        const rect = media.getBoundingClientRect();
         label.style.left = (rect.left + 4) + 'px';
         label.style.top = (rect.top + 4) + 'px';
 
@@ -83,6 +84,75 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
   // Make main editable
   main.contentEditable = 'true';
 
+  // Remove controls from videos in edit mode so they behave like images
+  function stripVideoControls(video) {
+    video.removeAttribute('controls');
+    video.pause();
+  }
+  main.querySelectorAll('video').forEach(stripVideoControls);
+
+  // Watch for new videos (e.g., pasted) and strip their controls
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      m.addedNodes.forEach(node => {
+        if (node.nodeName === 'VIDEO') stripVideoControls(node);
+        if (node.querySelectorAll) {
+          node.querySelectorAll('video').forEach(stripVideoControls);
+        }
+      });
+    });
+  });
+  observer.observe(main, { childList: true, subtree: true });
+
+  // Overlay container for video selection highlights
+  const videoSelectOverlay = document.createElement('div');
+  videoSelectOverlay.style.cssText = 'position: fixed; top: 0; left: 0; pointer-events: none; z-index: 50;';
+  document.body.appendChild(videoSelectOverlay);
+
+  // Update video selection overlay based on current selection
+  function updateVideoSelection() {
+    // Clear previous
+    main.querySelectorAll('video.selected').forEach(v => v.classList.remove('selected'));
+    videoSelectOverlay.innerHTML = '';
+
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    // Find all videos that intersect with selection
+    main.querySelectorAll('video').forEach(video => {
+      const range = selection.getRangeAt(0);
+      if (range.intersectsNode(video)) {
+        video.classList.add('selected');
+        // Add overlay
+        const rect = video.getBoundingClientRect();
+        const overlay = document.createElement('div');
+        overlay.className = 'video-select-overlay';
+        overlay.style.left = rect.left + 'px';
+        overlay.style.top = rect.top + 'px';
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+        videoSelectOverlay.appendChild(overlay);
+      }
+    });
+  }
+
+  // Listen for selection changes
+  document.addEventListener('selectionchange', updateVideoSelection);
+  window.addEventListener('scroll', updateVideoSelection);
+  window.addEventListener('resize', updateVideoSelection);
+
+  // Click on video to select it (images do this naturally, videos don't)
+  main.addEventListener('click', (e) => {
+    if (e.target.nodeName === 'VIDEO') {
+      e.preventDefault();
+      const range = document.createRange();
+      range.selectNode(e.target);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      // updateVideoSelection will be called by selectionchange event
+    }
+  });
 
   // Create bottom bar with instructions and save button
   const bar = document.createElement('div');
@@ -90,7 +160,7 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
   bar.innerHTML = `
     <div class="edit-instructions">
       <span class="shortcuts-full">
-        Drag and Drop images
+        Drag and Drop images/videos
         <kbd>Ctrl+2/3/4</kbd> Heading
         <kbd>Ctrl+0</kbd> Paragraph
         <kbd>Ctrl+L</kbd> List
@@ -170,69 +240,70 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
         e.preventDefault();
         document.execCommand('bold');
       }
-      // Ctrl+I for italic/em or image alt text
-      // Selection API: text selection has toString(), image selection brackets the node
+      // Ctrl+I for italic/em or image/video alt text
+      // Selection API: text selection has toString(), media selection brackets the node
       if (key === 'i') {
         e.preventDefault();
         const selection = window.getSelection();
         const text = selection.toString();
 
-        // Check if an image is selected (range brackets exactly one element node)
-        let img = null;
+        // Check if media is selected (range brackets exactly one element node)
+        let media = null;
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           if (range.startContainer === range.endContainer &&
               range.startContainer.nodeType === Node.ELEMENT_NODE &&
               range.endOffset - range.startOffset === 1) {
             const selectedNode = range.startContainer.childNodes[range.startOffset];
-            if (selectedNode && selectedNode.nodeName === 'IMG') {
-              img = selectedNode;
+            if (selectedNode && (selectedNode.nodeName === 'IMG' || selectedNode.nodeName === 'VIDEO')) {
+              media = selectedNode;
             }
           }
         }
 
-        if (img) {
-          // Image selected: edit alt text
-          const alt = prompt('Image alt text:', img.alt || '');
+        if (media) {
+          // Media selected: edit alt text
+          const label = media.nodeName === 'IMG' ? 'Image' : 'Video';
+          const alt = prompt(label + ' alt text:', media.alt || '');
           if (alt !== null) {
-            img.alt = alt;
+            media.alt = alt;
           }
         } else if (text) {
           // Text selected: apply italic/em
           document.execCommand('italic');
         }
       }
-      // Ctrl+J for image fit mode toggle
+      // Ctrl+J for media fit mode toggle
       if (key === 'j') {
         e.preventDefault();
         const selection = window.getSelection();
 
-        // Check if an image is selected
-        let img = null;
+        // Check if media is selected
+        let media = null;
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           if (range.startContainer === range.endContainer &&
               range.startContainer.nodeType === Node.ELEMENT_NODE &&
               range.endOffset - range.startOffset === 1) {
             const selectedNode = range.startContainer.childNodes[range.startOffset];
-            if (selectedNode && selectedNode.nodeName === 'IMG') {
-              img = selectedNode;
+            if (selectedNode && (selectedNode.nodeName === 'IMG' || selectedNode.nodeName === 'VIDEO')) {
+              media = selectedNode;
             }
           }
         }
 
-        if (img) {
+        if (media) {
           // Cycle through fit modes: none -> toowide -> tootall -> none
-          const currentFit = img.dataset.fit || 'none';
+          const currentFit = media.dataset.fit || 'none';
           const fitModes = ['none', 'toowide', 'tootall'];
           const currentIndex = fitModes.indexOf(currentFit);
           const nextIndex = (currentIndex + 1) % fitModes.length;
           const nextFit = fitModes[nextIndex];
 
           if (nextFit === 'none') {
-            delete img.dataset.fit;
+            delete media.dataset.fit;
           } else {
-            img.dataset.fit = nextFit;
+            media.dataset.fit = nextFit;
           }
           updateFitLabels();
         }
@@ -271,7 +342,7 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
   let dragCounter = 0;
   const dropHint = document.createElement('div');
   dropHint.className = 'drop-hint';
-  dropHint.textContent = 'Drop images here';
+  dropHint.textContent = 'Drop images or videos here';
   dropHint.style.display = 'none';
   document.body.appendChild(dropHint);
 
@@ -298,8 +369,9 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
     dragCounter = 0;
     dropHint.style.display = 'none';
 
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    if (files.length === 0) return;
+    const imageFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    const videoFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'));
+    if (imageFiles.length === 0 && videoFiles.length === 0) return;
 
     // Get selection/cursor position or append to main
     const selection = window.getSelection();
@@ -309,7 +381,8 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
       insertPoint = selection.getRangeAt(0);
     }
 
-    for (const file of files) {
+    // Handle images
+    for (const file of imageFiles) {
       const img = document.createElement('img');
       const hash = await hashFile(file);
       img.className = 'pending';
@@ -331,6 +404,31 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
         insertPoint.setStartAfter(img);
       } else {
         main.appendChild(img);
+      }
+    }
+
+    // Handle videos
+    for (const file of videoFiles) {
+      const video = document.createElement('video');
+      const hash = await hashFile(file);
+      video.className = 'pending';
+      video.dataset.hash = hash;
+      // No controls in edit mode - video behaves like image for selection
+
+      // Show preview using object URL and capture dimensions/duration
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.onloadedmetadata = () => {
+        video.dataset.width = video.videoWidth;
+        video.dataset.height = video.videoHeight;
+        video.dataset.duration = video.duration;
+      };
+
+      if (insertPoint) {
+        insertPoint.insertNode(video);
+        insertPoint.setStartAfter(video);
+      } else {
+        main.appendChild(video);
       }
     }
   });
@@ -359,7 +457,27 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
     return tag;
   }
 
-  // Get inline content (text, links, images, strong, em) from an element
+  // Get video tag with hash handling
+  function videoTag(node) {
+    let src = node.getAttribute('src') || '';
+    if (node.className === 'pending' || src.startsWith('blob:')) {
+      src = '_gallery/' + (node.dataset.hash || '') + '.mp4';
+    }
+    const hash = (src.match(/_gallery\/([a-f0-9]{12})\.mp4$/) || [])[1] || node.dataset.hash || '';
+    const poster = hash ? '_gallery/' + hash + '-poster.jpg' : '';
+    let tag = '<video src="' + src + '"';
+    if (poster) tag += ' poster="' + poster + '"';
+    if (node.alt) tag += ' alt="' + node.alt.replace(/"/g, '&quot;') + '"';
+    if (node.dataset.fit) tag += ' data-fit="' + node.dataset.fit + '"';
+    if (node.dataset.width) tag += ' data-width="' + node.dataset.width + '"';
+    if (node.dataset.height) tag += ' data-height="' + node.dataset.height + '"';
+    if (node.dataset.duration) tag += ' data-duration="' + node.dataset.duration + '"';
+    tag += ' controls>';
+    tag += '</video>';
+    return tag;
+  }
+
+  // Get inline content (text, links, images, videos, strong, em) from an element
   function inlineContent(el) {
     let result = '';
     for (const node of el.childNodes) {
@@ -375,6 +493,8 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
           result += '<em>' + inlineContent(node) + '</em>';
         } else if (tag === 'img') {
           result += imgTag(node);
+        } else if (tag === 'video') {
+          result += videoTag(node);
         } else if (tag === 'br') {
           // ignore
         } else {
@@ -405,6 +525,8 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
             result += '\n' + formatList(node, indent + 1);
           } else if (tag === 'img') {
             result += imgTag(node);
+          } else if (tag === 'video') {
+            result += videoTag(node);
           }
         }
       }
@@ -414,12 +536,14 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
     return result;
   }
 
-  // Output images from a container, respecting BR elements as row breaks
-  function formatImages(container) {
+  // Output images/videos from a container, respecting BR elements as row breaks
+  function formatMedia(container) {
     let result = '';
     for (const node of container.childNodes) {
       if (node.nodeName === 'IMG') {
         result += imgTag(node);
+      } else if (node.nodeName === 'VIDEO') {
+        result += videoTag(node);
       } else if (node.nodeName === 'BR') {
         result += '\n';
       }
@@ -431,24 +555,27 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
   // Convert DOM to formatted HTML
   function formatElement(el) {
     let result = '';
-    let lastWasImage = false;
+    let lastWasMedia = false;
 
     for (const node of el.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent.trim();
         if (text) {
           result += '<p>\n    ' + formatText(text) + '\n</p>';
-          lastWasImage = false;
+          lastWasMedia = false;
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const tag = node.tagName.toLowerCase();
 
         if (tag === 'img') {
           result += imgTag(node);
-          lastWasImage = true;
+          lastWasMedia = true;
+        } else if (tag === 'video') {
+          result += videoTag(node);
+          lastWasMedia = true;
         } else if (tag === 'br') {
-          // BR after images = new row
-          if (lastWasImage) {
+          // BR after media = new row
+          if (lastWasMedia) {
             result += '\n';
           }
         } else if (/^h[1-6]$/.test(tag)) {
@@ -456,31 +583,31 @@ main .container img[data-fit="tootall"] { outline: 3px solid #0066cc; }
           if (text) {
             result += '<' + tag + '>\n    ' + formatText(text) + '\n</' + tag + '>';
           }
-          lastWasImage = false;
+          lastWasMedia = false;
         } else if (tag === 'p' || tag === 'div') {
-          // Check if contains only images (no text content)
+          // Check if contains only media (no text content)
           const text = node.textContent.trim();
-          const images = node.querySelectorAll('img');
-          if (!text && images.length > 0) {
-            // Output images with BR handling, then add newline for next row
-            result += formatImages(node);
+          const media = node.querySelectorAll('img, video');
+          if (!text && media.length > 0) {
+            // Output media with BR handling, then add newline for next row
+            result += formatMedia(node);
             result += '\n';
-            lastWasImage = true;
+            lastWasMedia = true;
           } else {
             const content = inlineContent(node).trim();
             if (content) {
               result += '<p>\n    ' + formatText(content) + '\n</p>';
             }
-            lastWasImage = false;
+            lastWasMedia = false;
           }
         } else if (tag === 'ul') {
           result += formatList(node);
-          lastWasImage = false;
+          lastWasMedia = false;
         } else if (tag === 'a') {
           result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
-          lastWasImage = false;
+          lastWasMedia = false;
         } else {
-          lastWasImage = false;
+          lastWasMedia = false;
         }
       }
     }
