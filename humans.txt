@@ -74,6 +74,7 @@ Keyboard shortcuts:
 
 Ctrl+J      Cycle fit mode (image/video selected): none -> toowide -> tootall -> square
 Ctrl+.      Rotate image 90° clockwise (cycles: 0 -> 90 -> 180 -> 270 -> 0)
+Ctrl+Enter  Save (server mode only)
 
 Rotation in edit mode: Images are NOT visually rotated (to avoid layout issues
 with contentEditable). Instead, rotated images show a purple outline and a

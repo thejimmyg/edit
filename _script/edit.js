@@ -236,7 +236,8 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
       'Ctrl+B\t\t\tBold',
       'Ctrl+I\t\t\tItalic / Alt text',
       'Ctrl+J\t\t\tFit mode',
-      'Ctrl+.\t\t\tRotate'
+      'Ctrl+.\t\t\tRotate',
+      'Ctrl+Enter\t\tSave'
     ];
     alert(shortcuts.join('\n'));
   });
@@ -244,6 +245,13 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Ctrl+Enter to save (only when save button exists)
+    if (e.key === 'Enter' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('edit-save');
+      if (saveBtn) saveBtn.click();
+      return;
+    }
     // Enter creates a new paragraph (not just a line break)
     // Exception: when media is selected, allow default behavior for gallery row breaks
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
