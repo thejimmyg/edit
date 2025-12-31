@@ -318,7 +318,7 @@ main .container video { max-width: 100%; height: auto; }
       return { width: w, height: h };
     }
 
-    // Apply fit constraints to media marked tootall or toowide
+    // Apply fit constraints to media marked tootall, toowide, or square
     // Uses percentage-based widths so it's responsive without resize handlers
     function applyFitConstraints(container) {
       const tables = container.querySelectorAll('.gallery');
@@ -331,9 +331,32 @@ main .container video { max-width: 100%; height: auto; }
           mediaList.forEach((media, idx) => {
             if (!media) return;
             const fit = media.dataset.fit;
-            if (fit !== 'tootall' && fit !== 'toowide') return;
+            if (fit !== 'tootall' && fit !== 'toowide' && fit !== 'square') return;
 
-            // Find reference media: check left first, then wrap to right
+            const rotate = parseInt(media.dataset.rotate) || 0;
+            const wrapper = media.closest('.rotate-wrapper');
+
+            // Square mode: force 1:1 aspect ratio (no reference needed)
+            if (fit === 'square') {
+              if (wrapper && (rotate === 90 || rotate === 270)) {
+                // Rotated square: wrapper becomes square
+                wrapper.style.aspectRatio = 'auto';
+                wrapper.style.paddingBottom = '100%';
+                // Scale image to fill after rotation
+                media.style.width = '100%';
+                media.style.height = 'auto';
+                media.style.aspectRatio = '1';
+                media.style.objectFit = 'cover';
+              } else {
+                // Non-rotated square
+                media.style.width = '100%';
+                media.style.aspectRatio = '1';
+                media.style.objectFit = 'cover';
+              }
+              return;
+            }
+
+            // toowide/tootall: find reference media
             let refMedia = null;
             const order = [];
             for (let j = idx - 1; j >= 0; j--) order.push(j);
@@ -356,10 +379,6 @@ main .container video { max-width: 100%; height: auto; }
             if (!ref.width || !ref.height || !med.width || !med.height) return;
 
             const refAspect = ref.width / ref.height;
-            const rotate = parseInt(media.dataset.rotate) || 0;
-
-            // Check if media is in a rotation wrapper
-            const wrapper = media.closest('.rotate-wrapper');
 
             if (wrapper && (rotate === 90 || rotate === 270)) {
               // For rotated images, adjust the wrapper's aspect ratio

@@ -38,11 +38,13 @@ main .container img.pending, main .container video.pending { opacity: 0.6; borde
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
 main .container img[data-fit="tootall"], main .container video[data-fit="tootall"] { outline: 3px solid #0066cc; }
+main .container img[data-fit="square"], main .container video[data-fit="square"] { outline: 3px solid #339933; }
 main .container img[data-rotate] { outline: 3px solid #9933cc; }
 .video-select-overlay { position: absolute; background: rgba(0,102,204,0.3); pointer-events: none; z-index: 50; }
 .fit-label, .rotate-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
 .fit-label.toowide { background: rgba(230, 115, 0, 0.85); color: white; }
 .fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
+.fit-label.square { background: rgba(51, 153, 51, 0.85); color: white; }
 .rotate-label { background: rgba(153, 51, 204, 0.85); color: white; }
 `;
   document.head.appendChild(style);
@@ -60,7 +62,7 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
     // Add labels for media with data-fit
     main.querySelectorAll('img[data-fit], video[data-fit]').forEach(media => {
       const fit = media.dataset.fit;
-      if (fit === 'toowide' || fit === 'tootall') {
+      if (fit === 'toowide' || fit === 'tootall' || fit === 'square') {
         const label = document.createElement('span');
         label.className = 'fit-label ' + fit;
         label.textContent = fit;
@@ -90,9 +92,10 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
     });
   }
 
-  // Update labels on scroll/resize and initially
+  // Update labels on scroll/resize/input and initially
   window.addEventListener('scroll', updateLabels);
   window.addEventListener('resize', updateLabels);
+  main.addEventListener('input', () => setTimeout(updateLabels, 0));
   setTimeout(updateLabels, 100);
 
   // Make main editable
@@ -105,18 +108,41 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
   }
   main.querySelectorAll('video').forEach(stripVideoControls);
 
-  // Watch for new videos (e.g., pasted) and strip their controls
+  // Convert absolute URLs back to relative _gallery/ paths
+  function fixMediaSrc(el) {
+    const src = el.getAttribute('src');
+    if (!src) return;
+    // Match absolute URL ending in _gallery/HASH.ext
+    const match = src.match(/_gallery\/([a-f0-9]{12}\.(jpg|mp4))$/);
+    if (match && src.startsWith('http')) {
+      el.setAttribute('src', '_gallery/' + match[1]);
+    }
+  }
+
+  // Watch for new/changed media and fix URLs, strip video controls
   const observer = new MutationObserver((mutations) => {
     mutations.forEach(m => {
+      // Handle added nodes
       m.addedNodes.forEach(node => {
-        if (node.nodeName === 'VIDEO') stripVideoControls(node);
+        if (node.nodeName === 'VIDEO') {
+          stripVideoControls(node);
+          fixMediaSrc(node);
+        }
+        if (node.nodeName === 'IMG') {
+          fixMediaSrc(node);
+        }
         if (node.querySelectorAll) {
-          node.querySelectorAll('video').forEach(stripVideoControls);
+          node.querySelectorAll('video').forEach(v => { stripVideoControls(v); fixMediaSrc(v); });
+          node.querySelectorAll('img').forEach(fixMediaSrc);
         }
       });
+      // Handle attribute changes (e.g., src modified by paste)
+      if (m.type === 'attributes' && m.attributeName === 'src') {
+        fixMediaSrc(m.target);
+      }
     });
   });
-  observer.observe(main, { childList: true, subtree: true });
+  observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 
   // Overlay container for video selection highlights
   const videoSelectOverlay = document.createElement('div');
@@ -336,9 +362,9 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
         }
 
         if (media) {
-          // Cycle through fit modes: none -> toowide -> tootall -> none
+          // Cycle through fit modes: none -> toowide -> tootall -> square -> none
           const currentFit = media.dataset.fit || 'none';
-          const fitModes = ['none', 'toowide', 'tootall'];
+          const fitModes = ['none', 'toowide', 'tootall', 'square'];
           const currentIndex = fitModes.indexOf(currentFit);
           const nextIndex = (currentIndex + 1) % fitModes.length;
           const nextFit = fitModes[nextIndex];
