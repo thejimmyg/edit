@@ -32,7 +32,7 @@ body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-seri
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem;}
+header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem;}
 header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
@@ -52,6 +52,9 @@ main .container video { max-width: 100%; height: auto; }
 .gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }
 .gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
 .gallery video { cursor: pointer; }
+.gallery .rotate-wrapper { position: relative; overflow: hidden; width: 100%; }
+.gallery .rotate-wrapper a { position: absolute; inset: 0; }
+.gallery .rotate-wrapper img { position: absolute; left: 50%; top: 50%; max-height: none; max-width: none; }
 `;
   document.head.appendChild(style);
 
@@ -217,6 +220,10 @@ main .container video { max-width: 100%; height: auto; }
                 // Add srcset for gallery images - let browser choose size
                 const srcAttr = media.getAttribute('src') || '';
                 const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
+                const rotate = parseInt(media.dataset.rotate) || 0;
+                const w = parseInt(media.dataset.width) || 1;
+                const h = parseInt(media.dataset.height) || 1;
+
                 if (match) {
                   const hash = match[1];
                   const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
@@ -224,13 +231,53 @@ main .container video { max-width: 100%; height: auto; }
                   media.src = base + hash + '-800.jpg';
                   media.srcset = sizes.map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
                   media.sizes = Math.round(containerMax / row.length) + 'px';
+
                   // Wrap in link to highest res
                   const link = document.createElement('a');
                   link.href = base + hash + '-2400.jpg';
-                  link.appendChild(media);
-                  td.appendChild(link);
+
+                  if (rotate === 90 || rotate === 270) {
+                    // Create wrapper with swapped aspect ratio
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'rotate-wrapper';
+                    wrapper.style.aspectRatio = h + '/' + w;
+
+                    // Size image to fill wrapper when rotated
+                    // After rotation, image visual dims are h x w
+                    // Wrapper dims are h x w (via aspect-ratio)
+                    // Set image width = wrapper height ratio, height = wrapper width
+                    media.style.width = (w / h * 100) + '%';
+                    media.style.height = '100%';
+                    media.style.transform = 'translate(-50%, -50%) rotate(' + rotate + 'deg)';
+
+                    link.appendChild(media);
+                    wrapper.appendChild(link);
+                    td.appendChild(wrapper);
+                  } else if (rotate === 180) {
+                    media.style.transform = 'rotate(180deg)';
+                    link.appendChild(media);
+                    td.appendChild(link);
+                  } else {
+                    link.appendChild(media);
+                    td.appendChild(link);
+                  }
                 } else {
-                  td.appendChild(media);
+                  // No hash match - still handle rotation
+                  if (rotate === 90 || rotate === 270) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'rotate-wrapper';
+                    wrapper.style.aspectRatio = h + '/' + w;
+                    media.style.width = (w / h * 100) + '%';
+                    media.style.height = '100%';
+                    media.style.transform = 'translate(-50%, -50%) rotate(' + rotate + 'deg)';
+                    wrapper.appendChild(media);
+                    td.appendChild(wrapper);
+                  } else if (rotate === 180) {
+                    media.style.transform = 'rotate(180deg)';
+                    td.appendChild(media);
+                  } else {
+                    td.appendChild(media);
+                  }
                 }
               } else if (media.nodeName === 'VIDEO') {
                 // Handle gallery videos
@@ -255,6 +302,18 @@ main .container video { max-width: 100%; height: auto; }
         }
       }
     }
+    // Helper: get effective dimensions accounting for rotation
+    function getEffectiveDimensions(el) {
+      let w = parseInt(el.dataset.width) || el.naturalWidth || el.videoWidth;
+      let h = parseInt(el.dataset.height) || el.naturalHeight || el.videoHeight;
+      const rotate = parseInt(el.dataset.rotate) || 0;
+      // Swap dimensions for 90° or 270° rotation
+      if (rotate === 90 || rotate === 270) {
+        [w, h] = [h, w];
+      }
+      return { width: w, height: h };
+    }
+
     // Apply fit constraints to media marked tootall or toowide
     // Uses percentage-based widths so it's responsive without resize handlers
     function applyFitConstraints(container) {
@@ -286,22 +345,44 @@ main .container video { max-width: 100%; height: auto; }
 
             if (!refMedia) return;
 
-            // Get dimensions from data attributes (videos use videoWidth/videoHeight)
-            const refWidth = parseInt(refMedia.dataset.width) || refMedia.naturalWidth || refMedia.videoWidth;
-            const refHeight = parseInt(refMedia.dataset.height) || refMedia.naturalHeight || refMedia.videoHeight;
-            const mediaWidth = parseInt(media.dataset.width) || media.naturalWidth || media.videoWidth;
-            const mediaHeight = parseInt(media.dataset.height) || media.naturalHeight || media.videoHeight;
+            // Get effective dimensions (accounting for rotation)
+            const ref = getEffectiveDimensions(refMedia);
+            const med = getEffectiveDimensions(media);
 
-            if (!refWidth || !refHeight || !mediaWidth || !mediaHeight) return;
+            if (!ref.width || !ref.height || !med.width || !med.height) return;
 
-            const refAspect = refWidth / refHeight;
+            const refAspect = ref.width / ref.height;
+            const rotate = parseInt(media.dataset.rotate) || 0;
 
-            // Both tootall and toowide: crop to match reference aspect ratio
-            // tootall = portrait cropped to landscape shape
-            // toowide = landscape cropped to portrait shape
-            media.style.width = '100%';
-            media.style.aspectRatio = refAspect;
-            media.style.objectFit = 'cover';
+            // Check if media is in a rotation wrapper
+            const wrapper = media.closest('.rotate-wrapper');
+
+            if (wrapper && (rotate === 90 || rotate === 270)) {
+              // For rotated images, adjust the wrapper's aspect ratio
+              // Use padding-bottom trick instead of aspect-ratio property
+              // because aspect-ratio doesn't work reliably in table cells
+              // padding-bottom % is relative to WIDTH, so it creates aspect ratio
+              wrapper.style.aspectRatio = 'auto';  // Clear any existing
+              wrapper.style.paddingBottom = (ref.height / ref.width * 100) + '%';
+
+              // Make image large enough to definitely fill wrapper after rotation
+              // Use aspect-ratio: 1 to force square based on width (since height % may not work)
+              // The wrapper clips to the correct shape via overflow: hidden
+              const scale = Math.max(1 / refAspect, refAspect);
+              media.style.width = (scale * 100) + '%';
+              media.style.height = 'auto';
+              media.style.aspectRatio = '1';  // Force square based on width
+              media.style.objectFit = 'cover';
+
+              // Update sizes hint for srcset - scaled image needs larger source
+              const currentSizes = parseInt(media.sizes) || containerMax / cells.length;
+              media.sizes = Math.round(currentSizes * scale) + 'px';
+            } else {
+              // Both tootall and toowide: crop to match reference aspect ratio
+              media.style.width = '100%';
+              media.style.aspectRatio = refAspect;
+              media.style.objectFit = 'cover';
+            }
           });
         });
       });

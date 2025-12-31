@@ -18,10 +18,12 @@
   style.textContent = `
 header { display: none; }
 main .container { min-height: 50vh; display: block; }
+main .container p { margin: 0.5rem 0; }
+main .container h1, main .container h2, main .container h3, main .container h4 { margin: 1rem 0 0.5rem 0; }
 main .container:focus { outline: none; }
 main .container img, main .container video { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
 main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
-.edit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #f5f5f5; border-top: 1px solid #ccc; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+.edit-bar { position: sticky; top: 0; left: 0; right: 0; background: #f5f5f5; border-bottom: 1px solid #ccc; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
 .edit-bar button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
 .edit-bar button:hover { background: #e0e0e0; }
 .edit-bar a { padding: 0.5rem 1rem; }
@@ -41,22 +43,24 @@ main .container img.pending, main .container video.pending { opacity: 0.6; borde
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
 main .container img[data-fit="tootall"], main .container video[data-fit="tootall"] { outline: 3px solid #0066cc; }
+main .container img[data-rotate] { outline: 3px solid #9933cc; }
 .video-select-overlay { position: absolute; background: rgba(0,102,204,0.3); pointer-events: none; z-index: 50; }
-.fit-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
+.fit-label, .rotate-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
 .fit-label.toowide { background: rgba(230, 115, 0, 0.85); color: white; }
 .fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
+.rotate-label { background: rgba(153, 51, 204, 0.85); color: white; }
 `;
   document.head.appendChild(style);
 
-  // Create overlay container for fit labels (outside contentEditable)
-  const fitLabelOverlay = document.createElement('div');
-  fitLabelOverlay.style.cssText = 'position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100;';
-  document.body.appendChild(fitLabelOverlay);
+  // Create overlay container for labels (outside contentEditable)
+  const labelOverlay = document.createElement('div');
+  labelOverlay.style.cssText = 'position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100;';
+  document.body.appendChild(labelOverlay);
 
-  // Update fit labels on all images and videos
-  function updateFitLabels() {
+  // Update fit and rotation labels on all images and videos
+  function updateLabels() {
     // Remove existing labels
-    fitLabelOverlay.innerHTML = '';
+    labelOverlay.innerHTML = '';
 
     // Add labels for media with data-fit
     main.querySelectorAll('img[data-fit], video[data-fit]').forEach(media => {
@@ -71,15 +75,30 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
         label.style.left = (rect.left + 4) + 'px';
         label.style.top = (rect.top + 4) + 'px';
 
-        fitLabelOverlay.appendChild(label);
+        labelOverlay.appendChild(label);
       }
+    });
+
+    // Add labels for rotated images
+    main.querySelectorAll('img[data-rotate]').forEach(img => {
+      const rotate = img.dataset.rotate;
+      const label = document.createElement('span');
+      label.className = 'rotate-label';
+      label.textContent = rotate + '°';
+
+      // Position at bottom-left of image
+      const rect = img.getBoundingClientRect();
+      label.style.left = (rect.left + 4) + 'px';
+      label.style.top = (rect.bottom - 36) + 'px';
+
+      labelOverlay.appendChild(label);
     });
   }
 
   // Update labels on scroll/resize and initially
-  window.addEventListener('scroll', updateFitLabels);
-  window.addEventListener('resize', updateFitLabels);
-  setTimeout(updateFitLabels, 100);
+  window.addEventListener('scroll', updateLabels);
+  window.addEventListener('resize', updateLabels);
+  setTimeout(updateLabels, 100);
 
   // Make main editable
   main.contentEditable = 'true';
@@ -169,6 +188,7 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
         <kbd>Ctrl+B</kbd> Bold
         <kbd>Ctrl+I</kbd> Italic/Alt
         <kbd>Ctrl+J</kbd> Fit
+        <kbd>Ctrl+.</kbd> Rotate
       </span>
       <span class="shortcuts-link" id="shortcuts-link">Shortcuts</span>
     </div>
@@ -180,7 +200,7 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
       <a href="${location.pathname}">View</a>
     </div>
   `;
-  document.body.appendChild(bar);
+  document.body.prepend(bar);
 
   // Mobile shortcuts link click handler
   document.getElementById('shortcuts-link').addEventListener('click', () => {
@@ -188,11 +208,27 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
     alert(text);
   });
 
-  // Add padding to body so content isn't hidden behind bar
-  document.body.style.paddingBottom = '4rem';
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Enter creates a new paragraph (not just a line break)
+    // Exception: when media is selected, allow default behavior for gallery row breaks
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        // Check if we're selecting a media element (range brackets exactly one node)
+        const isMediaSelected = range.startContainer === range.endContainer &&
+              range.startContainer.nodeType === Node.ELEMENT_NODE &&
+              range.endOffset - range.startOffset === 1 &&
+              (range.startContainer.childNodes[range.startOffset]?.nodeName === 'IMG' ||
+               range.startContainer.childNodes[range.startOffset]?.nodeName === 'VIDEO');
+        if (!isMediaSelected) {
+          e.preventDefault();
+          document.execCommand('insertParagraph');
+        }
+      }
+    }
     // Ctrl+number for headings/paragraph
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
       const key = e.key;
@@ -305,8 +341,40 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
           } else {
             media.dataset.fit = nextFit;
           }
-          updateFitLabels();
+          updateLabels();
         }
+      }
+    }
+    // Ctrl+. for image rotation
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === '.') {
+      e.preventDefault();
+      const selection = window.getSelection();
+
+      // Check if an image is selected (rotation only for images, not video)
+      let img = null;
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (range.startContainer === range.endContainer &&
+            range.startContainer.nodeType === Node.ELEMENT_NODE &&
+            range.endOffset - range.startOffset === 1) {
+          const selectedNode = range.startContainer.childNodes[range.startOffset];
+          if (selectedNode && selectedNode.nodeName === 'IMG') {
+            img = selectedNode;
+          }
+        }
+      }
+
+      if (img) {
+        // Cycle through rotations: 0 -> 90 -> 180 -> 270 -> 0
+        const currentRotate = parseInt(img.dataset.rotate) || 0;
+        const nextRotate = (currentRotate + 90) % 360;
+
+        if (nextRotate === 0) {
+          delete img.dataset.rotate;
+        } else {
+          img.dataset.rotate = nextRotate;
+        }
+        updateLabels();
       }
     }
     // Tab/Shift+Tab for list indent/dedent
@@ -451,6 +519,7 @@ main .container img[data-fit="tootall"], main .container video[data-fit="tootall
     let tag = '<img src="' + src + '"';
     if (node.alt) tag += ' alt="' + node.alt.replace(/"/g, '&quot;') + '"';
     if (node.dataset.fit) tag += ' data-fit="' + node.dataset.fit + '"';
+    if (node.dataset.rotate) tag += ' data-rotate="' + node.dataset.rotate + '"';
     if (node.dataset.width) tag += ' data-width="' + node.dataset.width + '"';
     if (node.dataset.height) tag += ' data-height="' + node.dataset.height + '"';
     tag += '>';
