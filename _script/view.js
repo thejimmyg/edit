@@ -32,8 +32,8 @@ body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-seri
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem;}
-header .container { display: flex; gap: 1rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; gap: 1rem; padding: 0.5rem 1rem; }
+header .edit-link { margin-left: auto; }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
 header a, header a:visited { text-decoration: none; }
@@ -132,14 +132,18 @@ main .container video { max-width: 100%; height: auto; }
       return '<a href="' + root + p + '/index.html">' + title + '</a>' + arrow;
     }).join('');
 
-    // Header with container
+    // Header (full width, no container)
     const header = document.createElement('header');
-    const headerContainer = document.createElement('div');
-    headerContainer.className = 'container';
-    headerContainer.appendChild(siteTitle);
-    if (crumbs.length > 0) headerContainer.appendChild(breadcrumbNav);
-    headerContainer.appendChild(sectionNav);
-    header.appendChild(headerContainer);
+    header.appendChild(siteTitle);
+    if (crumbs.length > 0) header.appendChild(breadcrumbNav);
+    header.appendChild(sectionNav);
+
+    // Edit link on far right
+    const editLink = document.createElement('a');
+    editLink.href = location.pathname + '?edit';
+    editLink.className = 'edit-link';
+    editLink.textContent = 'Edit';
+    header.appendChild(editLink);
 
     // Footer with container and Top link (hidden initially)
     const footer = document.createElement('footer');

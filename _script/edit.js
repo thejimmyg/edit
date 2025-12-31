@@ -23,22 +23,17 @@ main .container h1, main .container h2, main .container h3, main .container h4 {
 main .container:focus { outline: none; }
 main .container img, main .container video { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
 main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
-.edit-bar { position: sticky; top: 0; left: 0; right: 0; background: #f5f5f5; border-bottom: 1px solid #ccc; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
-.edit-bar button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+.edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; line-height: 2rem; font-size: 0.8rem; }
+.edit-bar .edit-title { font-weight: bold; }
+.edit-bar a { color: black; text-decoration: none; margin-left: 1rem; cursor: pointer; }
+.edit-bar a:hover { text-decoration: underline; }
+.edit-bar button { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin-left: 1rem; }
 .edit-bar button:hover { background: #e0e0e0; }
-.edit-bar a { padding: 0.5rem 1rem; }
-#edit-status { color: #080; min-width: 4rem; }
-.edit-instructions { font-size: 0.85rem; color: #666; }
-.edit-instructions kbd { background: #e0e0e0; padding: 0.1rem 0.4rem; border-radius: 3px; font-family: inherit; }
-.edit-instructions .shortcuts-full { display: inline; }
-.edit-instructions .shortcuts-link { display: none; color: #0066cc; cursor: pointer; text-decoration: underline; }
+#edit-status { color: #080; margin-right: 0.5rem; min-width: 3rem; }
 @media (max-width: 768px) {
-  .edit-instructions .shortcuts-full { display: none; }
-  .edit-instructions .shortcuts-link { display: inline; }
   .edit-bar { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
   .edit-bar button { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
-  .edit-bar a { padding: 0.3rem 0.4rem; }
-  .edit-bar > div { gap: 0.25rem !important; }
+  .edit-bar a { margin-left: 0.5rem; }
 }
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
@@ -173,39 +168,51 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
     }
   });
 
-  // Create bottom bar with instructions and save button
+  // Create top bar with Edit title and actions
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
   bar.innerHTML = `
-    <div class="edit-instructions">
-      <span class="shortcuts-full">
-        Drag and Drop images/videos
-        <kbd>Ctrl+2/3/4</kbd> Heading
-        <kbd>Ctrl+0</kbd> Paragraph
-        <kbd>Ctrl+L</kbd> List
-        <kbd>Tab</kbd> Indent
-        <kbd>Ctrl+K</kbd> Link
-        <kbd>Ctrl+B</kbd> Bold
-        <kbd>Ctrl+I</kbd> Italic/Alt
-        <kbd>Ctrl+J</kbd> Fit
-        <kbd>Ctrl+.</kbd> Rotate
-      </span>
-      <span class="shortcuts-link" id="shortcuts-link">Shortcuts</span>
+    <div>
+      <span class="edit-title">Edit Mode</span>
     </div>
-    <div style="display:flex;align-items:center;gap:0.5rem">
+    <div style="display:flex;align-items:center">
       <span id="edit-status"></span>
-      <button id="edit-copy">Copy</button>
-      ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
+      <a id="shortcuts-link">Shortcuts</a>
       <a id="edit-download" href="#" download="index.html">Download</a>
-      <a href="${location.pathname}">View</a>
+      <a id="edit-copy">Copy</a>
+      ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
+      <a id="edit-view" href="${location.pathname}">View</a>
     </div>
   `;
+
   document.body.prepend(bar);
 
-  // Mobile shortcuts link click handler
+  // Track unsaved changes
+  let hasUnsavedChanges = false;
+  main.addEventListener('input', () => { hasUnsavedChanges = true; });
+
+  // View link confirms if unsaved changes
+  document.getElementById('edit-view').addEventListener('click', (e) => {
+    if (hasUnsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) {
+      e.preventDefault();
+    }
+  });
+
+  // Shortcuts link click handler - show alert with formatted shortcuts
   document.getElementById('shortcuts-link').addEventListener('click', () => {
-    const text = document.querySelector('.shortcuts-full').textContent.trim().replace(/\s+/g, ' ');
-    alert(text);
+    const shortcuts = [
+      'Drag & Drop\t\tAdd images/videos',
+      'Ctrl+2/3/4\t\tHeading',
+      'Ctrl+0\t\t\tParagraph',
+      'Ctrl+L\t\t\tList',
+      'Tab\t\t\t\tIndent',
+      'Ctrl+K\t\t\tLink',
+      'Ctrl+B\t\t\tBold',
+      'Ctrl+I\t\t\tItalic / Alt text',
+      'Ctrl+J\t\t\tFit mode',
+      'Ctrl+.\t\t\tRotate'
+    ];
+    alert(shortcuts.join('\n'));
   });
 
 
@@ -693,7 +700,8 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
   }
 
   // Copy to clipboard functionality
-  document.getElementById('edit-copy').addEventListener('click', async () => {
+  document.getElementById('edit-copy').addEventListener('click', async (e) => {
+    e.preventDefault();
     const html = generateHTML();
     const status = document.getElementById('edit-status');
     try {
@@ -732,6 +740,7 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
         });
         if (response.ok) {
           status.textContent = 'Saved';
+          hasUnsavedChanges = false;
           setTimeout(() => status.textContent = '', 2000);
         } else {
           throw new Error(response.statusText);
