@@ -25,7 +25,7 @@ main .container img, main .container video { max-width: 200px; height: auto; mar
 main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
 .edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; line-height: 2rem; font-size: 0.8rem; }
 .edit-bar .edit-title { font-weight: bold; }
-.edit-bar a { color: black; text-decoration: none; margin-left: 1rem; cursor: pointer; }
+.edit-bar a { color: black; text-decoration: none; margin-left: 1rem; cursor: pointer; display: inline-flex; align-items: center; }
 .edit-bar a:hover { text-decoration: underline; }
 .edit-bar button { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin-left: 1rem; }
 .edit-bar button:hover { background: #e0e0e0; }
@@ -219,7 +219,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       <a id="edit-download" href="#" download="index.html">Download</a>
       <a id="edit-copy">Copy</a>
       ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
-      <a id="edit-view" href="${location.pathname}">View</a>
+      <a id="edit-view" href="${location.pathname}" title="Exit edit mode"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2l-10 10"/></svg></a>
     </div>
   `;
 

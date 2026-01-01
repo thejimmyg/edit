@@ -32,8 +32,9 @@ body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-seri
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; gap: 1rem; padding: 0.5rem 1rem; }
+header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; }
 header .edit-link { margin-left: auto; }
+header .edit-link svg { transform: translateY(2px); }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
 header a, header a:visited { text-decoration: none; }
@@ -138,11 +139,11 @@ main .container video { max-width: 100%; height: auto; }
     if (crumbs.length > 0) header.appendChild(breadcrumbNav);
     header.appendChild(sectionNav);
 
-    // Edit link on far right
+    // Edit link on far right (pencil icon)
     const editLink = document.createElement('a');
     editLink.href = location.pathname + '?edit';
     editLink.className = 'edit-link';
-    editLink.textContent = 'Edit';
+    editLink.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 1l2 2-9 9-2.5.5.5-2.5L11 1z"/></svg>';
     header.appendChild(editLink);
 
     // Footer with container and Top link (hidden initially)
