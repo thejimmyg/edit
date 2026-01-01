@@ -72,13 +72,16 @@ Keyboard shortcuts:
   Ctrl+B      Bold/strong (select text first)
   Ctrl+I      Italic/em (text selected) or alt text (image/video selected)
 
-Ctrl+J      Cycle fit mode (image/video selected): none -> toowide -> tootall -> square
+Ctrl+J      Cycle fit mode (image/video selected, see Fit modes below)
 Ctrl+.      Rotate image 90° clockwise (cycles: 0 -> 90 -> 180 -> 270 -> 0)
+Ctrl+[ / ]  Fine rotate image -1° / +1° (works with any rotation)
+Ctrl+, / /  Zoom out / in 2% (100% minimum, 200% maximum)
+Ctrl+Arrow  Pan image 2% in direction (range limited by zoom level)
 Ctrl+Enter  Save (server mode only)
 
-Rotation in edit mode: Images are NOT visually rotated (to avoid layout issues
-with contentEditable). Instead, rotated images show a purple outline and a
-label (e.g., "90°") at the bottom-left. Use View mode to see actual rotation.
+Transforms in edit mode: Images with rotation, zoom, or pan show a purple
+outline and a label at bottom-left (e.g., "93° 110% ↔5 ↕-3"). Use View mode
+to see actual transforms applied.
 
 Selection in JS: Text selection returns content via selection.toString().
 Media selection brackets the element within its parent - the range's
@@ -95,27 +98,43 @@ and is referenced by SHA256 hash (first 12 chars):
   - Videos: _gallery/HASH.mp4 with poster="_gallery/HASH-poster.jpg"
 
 Dimensions stored as data-width and data-height. Videos also store
-data-duration (in seconds). Images can have data-rotate (90, 180, 270).
+data-duration (in seconds). Images can have:
+  - data-rotate: any degree 0-359 (90° increments via Ctrl+., fine via Ctrl+[/])
+  - data-zoom: percentage 100-200 (default 100, omitted when 100)
+  - data-pan-x: horizontal offset -50 to +50 (default 0, omitted when 0)
+  - data-pan-y: vertical offset -50 to +50 (default 0, omitted when 0)
 
-Rotation in view mode: Images with data-rotate are wrapped in a .rotate-wrapper
-div. The wrapper uses padding-bottom percentage (relative to width) to create
-the aspect ratio, because CSS aspect-ratio property doesn't work reliably in
-table cells. The image is positioned absolutely, centered with translate(-50%,
--50%), then rotated. For 90°/270° rotations, the wrapper's padding-bottom is
-calculated from swapped dimensions (height/width instead of width/height).
+Transforms in view mode: Images with rotation, zoom, or pan are wrapped in a
+.rotate-wrapper div. The wrapper uses aspect-ratio to maintain shape. For
+rotations near 90°/270°, dimensions are swapped.
 
-Rotation + fit mode: When a rotated image also has fit mode (toowide/tootall),
-the wrapper's padding-bottom is recalculated to match the reference image's
-aspect ratio. The image is scaled larger (using max of aspect ratio and its
-inverse), forced square via aspect-ratio: 1, and object-fit: cover fills it.
-The wrapper clips to the target shape via overflow: hidden. This approach works
-around CSS limitations where percentage heights don't resolve correctly for
-absolutely positioned images in table cells.
+Auto-scale: Two types of automatic scaling are applied:
+  1. Cover scale: When image aspect differs from wrapper (e.g., landscape image
+     in portrait wrapper), scale up so image fills the wrapper completely.
+  2. Rotation scale: Non-90° rotations leave corner gaps; getRotationScale()
+     calculates the minimum scale to fill the frame.
+User zoom (data-zoom) is applied on top of both auto-scales.
 
-Square fit mode: Forces a 1:1 aspect ratio regardless of reference images.
-Useful for creating uniform square thumbnails. Works with rotated images -
-the wrapper becomes square and the image is cropped to fill. Green outline
-in edit mode.
+Pan limits: Pan is clamped based on zoom level to prevent showing edges. At
+zoom=100%, no pan is allowed (image exactly fills frame). Higher zoom allows
+more pan range, calculated as: maxPan = ((scale - 1) / scale) * 50.
+
+Transform application: The image is positioned with translate (centered + pan),
+then rotated, then scaled. The wrapper clips via overflow: hidden.
+
+Fit modes (Ctrl+J cycles: none -> toowide -> tootall -> square):
+  - toowide: Crop to match the aspect ratio of a reference image in the row.
+    Use when an image is wider than others and needs to match their height.
+  - tootall: Same as toowide (both find a reference and crop to match).
+  - square: Force 1:1 visual aspect ratio. Useful for uniform thumbnails.
+  - none: Remove fit mode, use natural aspect ratio.
+
+Fit modes work with rotated images. A 90° rotated portrait becomes landscape;
+marking it "toowide" next to a portrait will crop it to match. The cover scale
+ensures the rotated image fills the target aspect ratio completely.
+
+Edit mode outlines: Purple for rotation/zoom/pan, green for square fit,
+orange for toowide/tootall.
 
 The srcset sizes hint is also scaled up for rotated+fit images, so the browser
 fetches a larger source image. For example, a 1.5x scale on a 500px display

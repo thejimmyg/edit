@@ -45,12 +45,12 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-d
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 main .container video { max-width: 100%; height: auto; }
-.gallery { padding-top: 0.5rem; padding-bottom: 0.5rem }
-.gallery { table-layout: fixed; width: 100%; width: min(105vh, calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: -${containerPad}rem -cacl(2*${containerPad}rem) 0 -${containerPad}rem; }
-.gallery td { padding: 0; margin: 0; border: 0; vertical-align: top; }
-.gallery a { display: block; padding: 0; margin: 0; border: 0; }
-.gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; padding: 0; margin: 0; border: 0; object-fit: contain; }
+.gallery { table-layout: fixed; width: min(94vh, calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
+.gallery td { padding: 0; border: 0; vertical-align: top; }
+.gallery a { display: block; }
+.gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; object-fit: contain; }
 .gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
+.gallery img[data-fit="square"] { max-height: none; }
 .gallery video { cursor: pointer; }
 .gallery .rotate-wrapper { position: relative; overflow: hidden; width: 100%; }
 .gallery .rotate-wrapper a { position: absolute; inset: 0; }
@@ -225,60 +225,124 @@ main .container video { max-width: 100%; height: auto; }
                 const srcAttr = media.getAttribute('src') || '';
                 const match = srcAttr.match(/_gallery\/([a-f0-9]{12})\.jpg$/);
                 const rotate = parseInt(media.dataset.rotate) || 0;
+                const zoom = parseInt(media.dataset.zoom) || 100;
+                const panX = parseInt(media.dataset.panX) || 0;
+                const panY = parseInt(media.dataset.panY) || 0;
                 const w = parseInt(media.dataset.width) || 1;
                 const h = parseInt(media.dataset.height) || 1;
+                const imgAspect = w / h;
+
+                // Determine if we need wrapper (for rotations near 90°/270°)
+                const nearestRight = Math.round(rotate / 90) * 90;
+                const needsWrapper = (nearestRight === 90 || nearestRight === 270);
+                const hasTransform = rotate !== 0 || zoom !== 100 || panX !== 0 || panY !== 0;
 
                 if (match) {
                   const hash = match[1];
                   const base = srcAttr.replace(/[a-f0-9]{12}\.jpg$/, '');
-                  const sizes = [400, 800, 1600, 2400];
+                  const srcsetSizes = [400, 800, 1600, 2400];
                   media.src = base + hash + '-800.jpg';
-                  media.srcset = sizes.map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
-                  media.sizes = Math.round(containerMax / row.length) + 'px';
+                  media.srcset = srcsetSizes.map(s => base + hash + '-' + s + '.jpg ' + s + 'w').join(', ');
+                  const baseDisplaySize = Math.round(containerMax / row.length);
 
                   // Wrap in link to highest res
                   const link = document.createElement('a');
                   link.href = base + hash + '-2400.jpg';
 
-                  if (rotate === 90 || rotate === 270) {
+                  if (needsWrapper) {
                     // Create wrapper with swapped aspect ratio
                     const wrapper = document.createElement('div');
                     wrapper.className = 'rotate-wrapper';
                     wrapper.style.aspectRatio = h + '/' + w;
 
-                    // Size image to fill wrapper when rotated
-                    // After rotation, image visual dims are h x w
-                    // Wrapper dims are h x w (via aspect-ratio)
-                    // Set image width = wrapper height ratio, height = wrapper width
-                    media.style.width = (w / h * 100) + '%';
-                    media.style.height = '100%';
-                    media.style.transform = 'translate(-50%, -50%) rotate(' + rotate + 'deg)';
+                    // Calculate auto-scale for rotation + user zoom
+                    // Use offset from nearest 90° (e.g., 89° → 1°, 91° → 1°)
+                    const rotationOffset = Math.abs(rotate - nearestRight);
+                    const containerAspect = h / w; // swapped for wrapper
+                    const autoScale = getRotationScale(rotationOffset, h / w, containerAspect);
+                    const totalScale = autoScale * (zoom / 100);
+
+                    // Update sizes hint for higher resolution when scaled
+                    // Add 20% buffer to encourage browser to pick higher res
+                    media.sizes = Math.round(baseDisplaySize * totalScale * 1.2) + 'px';
+
+                    // Clamp pan to prevent showing edges
+                    const maxPan = totalScale > 1 ? ((totalScale - 1) / totalScale) * 50 : 0;
+                    const clampedPanX = Math.max(-maxPan, Math.min(maxPan, panX));
+                    const clampedPanY = Math.max(-maxPan, Math.min(maxPan, panY));
+
+                    // Build transform
+                    const translateX = -50 + clampedPanX;
+                    const translateY = -50 + clampedPanY;
+                    media.style.width = (w / h * 100 * totalScale) + '%';
+                    media.style.height = 'auto';
+                    media.style.transform = `translate(${translateX}%, ${translateY}%) rotate(${rotate}deg)`;
 
                     link.appendChild(media);
                     wrapper.appendChild(link);
                     td.appendChild(wrapper);
-                  } else if (rotate === 180) {
-                    media.style.transform = 'rotate(180deg)';
+                  } else if (hasTransform) {
+                    // Non-wrapper transforms (0°, 180°, or small rotations near 0°/180°)
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'rotate-wrapper';
+                    wrapper.style.aspectRatio = w + '/' + h;
+
+                    // Calculate auto-scale for rotation + user zoom
+                    // Use offset from nearest 90° (e.g., 2° → 2°, 178° → 2°)
+                    const rotationOffset = Math.abs(rotate - nearestRight);
+                    const autoScale = getRotationScale(rotationOffset, imgAspect, imgAspect);
+                    const totalScale = autoScale * (zoom / 100);
+
+                    // Update sizes hint for higher resolution when scaled
+                    // Add 20% buffer to encourage browser to pick higher res
+                    media.sizes = Math.round(baseDisplaySize * totalScale * 1.2) + 'px';
+
+                    // Clamp pan
+                    const maxPan = totalScale > 1 ? ((totalScale - 1) / totalScale) * 50 : 0;
+                    const clampedPanX = Math.max(-maxPan, Math.min(maxPan, panX));
+                    const clampedPanY = Math.max(-maxPan, Math.min(maxPan, panY));
+
+                    const translateX = -50 + clampedPanX;
+                    const translateY = -50 + clampedPanY;
+                    media.style.width = (100 * totalScale) + '%';
+                    media.style.height = 'auto';
+                    media.style.transform = `translate(${translateX}%, ${translateY}%) rotate(${rotate}deg)`;
+
                     link.appendChild(media);
-                    td.appendChild(link);
+                    wrapper.appendChild(link);
+                    td.appendChild(wrapper);
                   } else {
+                    media.sizes = baseDisplaySize + 'px';
                     link.appendChild(media);
                     td.appendChild(link);
                   }
                 } else {
-                  // No hash match - still handle rotation
-                  if (rotate === 90 || rotate === 270) {
+                  // No hash match - still handle transforms
+                  if (needsWrapper || hasTransform) {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'rotate-wrapper';
-                    wrapper.style.aspectRatio = h + '/' + w;
-                    media.style.width = (w / h * 100) + '%';
-                    media.style.height = '100%';
-                    media.style.transform = 'translate(-50%, -50%) rotate(' + rotate + 'deg)';
+                    wrapper.style.aspectRatio = needsWrapper ? (h + '/' + w) : (w + '/' + h);
+
+                    // Use offset from nearest 90° for auto-scale calculation
+                    const rotationOffset = Math.abs(rotate - nearestRight);
+                    const containerAspect = needsWrapper ? (h / w) : imgAspect;
+                    const effectiveImgAspect = needsWrapper ? (h / w) : imgAspect;
+                    const autoScale = getRotationScale(rotationOffset, effectiveImgAspect, containerAspect);
+                    const totalScale = autoScale * (zoom / 100);
+
+                    const maxPan = totalScale > 1 ? ((totalScale - 1) / totalScale) * 50 : 0;
+                    const clampedPanX = Math.max(-maxPan, Math.min(maxPan, panX));
+                    const clampedPanY = Math.max(-maxPan, Math.min(maxPan, panY));
+
+                    const translateX = -50 + clampedPanX;
+                    const translateY = -50 + clampedPanY;
+                    const baseWidth = needsWrapper ? (w / h * 100) : 100;
+                    media.style.width = (baseWidth * totalScale) + '%';
+                    media.style.height = 'auto';
+                    media.style.transform = `translate(${translateX}%, ${translateY}%) rotate(${rotate}deg)`;
+
                     wrapper.appendChild(media);
                     td.appendChild(wrapper);
-                  } else if (rotate === 180) {
-                    media.style.transform = 'rotate(180deg)';
-                    td.appendChild(media);
                   } else {
                     td.appendChild(media);
                   }
@@ -311,11 +375,25 @@ main .container video { max-width: 100%; height: auto; }
       let w = parseInt(el.dataset.width) || el.naturalWidth || el.videoWidth;
       let h = parseInt(el.dataset.height) || el.naturalHeight || el.videoHeight;
       const rotate = parseInt(el.dataset.rotate) || 0;
-      // Swap dimensions for 90° or 270° rotation
-      if (rotate === 90 || rotate === 270) {
+      // For rotations near 90° or 270°, swap dimensions
+      const nearestRight = Math.round(rotate / 90) * 90;
+      if (nearestRight === 90 || nearestRight === 270) {
         [w, h] = [h, w];
       }
       return { width: w, height: h };
+    }
+
+    // Helper: calculate scale needed to fill container after rotation (no whitespace)
+    function getRotationScale(angleDeg, imgAspect, containerAspect) {
+      if (angleDeg === 0) return 1;
+      const rad = angleDeg * Math.PI / 180;
+      const cos = Math.abs(Math.cos(rad));
+      const sin = Math.abs(Math.sin(rad));
+      // Bounding box of rotated image relative to original
+      const boundingWidth = cos + sin / imgAspect;
+      const boundingHeight = sin + cos * imgAspect;
+      // Scale to fill container (cover, not contain)
+      return Math.max(boundingWidth, boundingHeight / containerAspect);
     }
 
     // Apply fit constraints to media marked tootall, toowide, or square
@@ -336,75 +414,70 @@ main .container video { max-width: 100%; height: auto; }
             const rotate = parseInt(media.dataset.rotate) || 0;
             const wrapper = media.closest('.rotate-wrapper');
 
-            // Square mode: force 1:1 aspect ratio (no reference needed)
-            if (fit === 'square') {
-              if (wrapper && (rotate === 90 || rotate === 270)) {
-                // Rotated square: wrapper becomes square
-                wrapper.style.aspectRatio = 'auto';
-                wrapper.style.paddingBottom = '100%';
-                // Scale image to fill after rotation
-                media.style.width = '100%';
-                media.style.height = 'auto';
-                media.style.aspectRatio = '1';
-                media.style.objectFit = 'cover';
-              } else {
-                // Non-rotated square
-                media.style.width = '100%';
-                media.style.aspectRatio = '1';
-                media.style.objectFit = 'cover';
+            const zoom = parseInt(media.dataset.zoom) || 100;
+            const panX = parseInt(media.dataset.panX) || 0;
+            const panY = parseInt(media.dataset.panY) || 0;
+            const nearestRight = Math.round(rotate / 90) * 90;
+
+            // Get target aspect ratio (1 for square, or from reference image)
+            let targetAspect = 1;
+            if (fit !== 'square') {
+              // Find reference media for toowide/tootall
+              let refMedia = null;
+              const order = [];
+              for (let j = idx - 1; j >= 0; j--) order.push(j);
+              for (let j = idx + 1; j < mediaList.length; j++) order.push(j);
+              for (const j of order) {
+                const candidate = mediaList[j];
+                if (candidate && (!candidate.dataset.fit || candidate.dataset.fit === 'none')) {
+                  refMedia = candidate;
+                  break;
+                }
               }
-              return;
+              if (!refMedia) return;
+              const ref = getEffectiveDimensions(refMedia);
+              if (!ref.width || !ref.height) return;
+              targetAspect = ref.width / ref.height;
             }
 
-            // toowide/tootall: find reference media
-            let refMedia = null;
-            const order = [];
-            for (let j = idx - 1; j >= 0; j--) order.push(j);
-            for (let j = idx + 1; j < mediaList.length; j++) order.push(j);
+            const w = parseInt(media.dataset.width) || 1;
+            const h = parseInt(media.dataset.height) || 1;
 
-            for (const j of order) {
-              const candidate = mediaList[j];
-              if (candidate && (!candidate.dataset.fit || candidate.dataset.fit === 'none')) {
-                refMedia = candidate;
-                break;
-              }
-            }
+            if (wrapper) {
+              // Set target aspect ratio (1 for square, reference aspect for toowide/tootall)
+              wrapper.style.aspectRatio = targetAspect === 1 ? '1 / 1' : targetAspect.toFixed(4) + ' / 1';
 
-            if (!refMedia) return;
+              // Calculate scales: cover (fill wrapper) + rotation (avoid corner gaps) + user zoom
+              const rotationOffset = Math.abs(rotate - nearestRight);
+              const effectiveAspect = (nearestRight === 90 || nearestRight === 270) ? (h / w) : (w / h);
+              const coverScale = Math.max(1, effectiveAspect / targetAspect);
+              const autoScale = getRotationScale(rotationOffset, effectiveAspect, targetAspect);
+              const totalScale = coverScale * autoScale * (zoom / 100);
 
-            // Get effective dimensions (accounting for rotation)
-            const ref = getEffectiveDimensions(refMedia);
-            const med = getEffectiveDimensions(media);
+              // Clamp pan based on zoom
+              const maxPan = totalScale > 1 ? ((totalScale - 1) / totalScale) * 50 : 0;
+              const clampedPanX = Math.max(-maxPan, Math.min(maxPan, panX));
+              const clampedPanY = Math.max(-maxPan, Math.min(maxPan, panY));
 
-            if (!ref.width || !ref.height || !med.width || !med.height) return;
-
-            const refAspect = ref.width / ref.height;
-
-            if (wrapper && (rotate === 90 || rotate === 270)) {
-              // For rotated images, adjust the wrapper's aspect ratio
-              // Use padding-bottom trick instead of aspect-ratio property
-              // because aspect-ratio doesn't work reliably in table cells
-              // padding-bottom % is relative to WIDTH, so it creates aspect ratio
-              wrapper.style.aspectRatio = 'auto';  // Clear any existing
-              wrapper.style.paddingBottom = (ref.height / ref.width * 100) + '%';
-
-              // Make image large enough to definitely fill wrapper after rotation
-              // Use aspect-ratio: 1 to force square based on width (since height % may not work)
-              // The wrapper clips to the correct shape via overflow: hidden
-              const scale = Math.max(1 / refAspect, refAspect);
-              media.style.width = (scale * 100) + '%';
+              // Apply transform
+              const baseWidth = (nearestRight === 90 || nearestRight === 270) ? (w / h * 100) : 100;
+              media.style.width = (baseWidth * totalScale) + '%';
               media.style.height = 'auto';
-              media.style.aspectRatio = '1';  // Force square based on width
-              media.style.objectFit = 'cover';
+              media.style.transform = `translate(${-50 + clampedPanX}%, ${-50 + clampedPanY}%) rotate(${rotate}deg)`;
 
-              // Update sizes hint for srcset - scaled image needs larger source
+              // Update srcset sizes hint
               const currentSizes = parseInt(media.sizes) || containerMax / cells.length;
-              media.sizes = Math.round(currentSizes * scale) + 'px';
+              media.sizes = Math.round(currentSizes * totalScale * 1.2) + 'px';
             } else {
-              // Both tootall and toowide: crop to match reference aspect ratio
+              // No wrapper - use objectFit approach
+              const maxPan = zoom > 100 ? ((zoom - 100) / zoom) * 50 : 0;
+              const clampedPanX = Math.max(-maxPan, Math.min(maxPan, panX));
+              const clampedPanY = Math.max(-maxPan, Math.min(maxPan, panY));
               media.style.width = '100%';
-              media.style.aspectRatio = refAspect;
+              media.style.aspectRatio = targetAspect.toString();
               media.style.objectFit = 'cover';
+              media.style.objectPosition = `${50 + clampedPanX}% ${50 + clampedPanY}%`;
+              if (zoom > 100) media.style.transform = `scale(${zoom / 100})`;
             }
           });
         });

@@ -39,13 +39,13 @@ main .container img.pending, main .container video.pending { opacity: 0.6; borde
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
 main .container img[data-fit="tootall"], main .container video[data-fit="tootall"] { outline: 3px solid #0066cc; }
 main .container img[data-fit="square"], main .container video[data-fit="square"] { outline: 3px solid #339933; }
-main .container img[data-rotate] { outline: 3px solid #9933cc; }
+main .container img[data-rotate], main .container img[data-zoom], main .container img[data-pan-x], main .container img[data-pan-y] { outline: 3px solid #9933cc; }
 .video-select-overlay { position: absolute; background: rgba(0,102,204,0.3); pointer-events: none; z-index: 50; }
-.fit-label, .rotate-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
+.fit-label, .transform-label { position: absolute; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; pointer-events: none; z-index: 100; }
 .fit-label.toowide { background: rgba(230, 115, 0, 0.85); color: white; }
 .fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
 .fit-label.square { background: rgba(51, 153, 51, 0.85); color: white; }
-.rotate-label { background: rgba(153, 51, 204, 0.85); color: white; }
+.transform-label { background: rgba(153, 51, 204, 0.85); color: white; }
 `;
   document.head.appendChild(style);
 
@@ -76,17 +76,29 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
       }
     });
 
-    // Add labels for rotated images
-    main.querySelectorAll('img[data-rotate]').forEach(img => {
-      const rotate = img.dataset.rotate;
+    // Add labels for images with transforms (rotate, zoom, pan)
+    main.querySelectorAll('img').forEach(img => {
+      const rotate = parseInt(img.dataset.rotate) || 0;
+      const zoom = parseInt(img.dataset.zoom) || 100;
+      const panX = parseInt(img.dataset.panX) || 0;
+      const panY = parseInt(img.dataset.panY) || 0;
+
+      // Build label text from non-default values
+      const parts = [];
+      if (rotate !== 0) parts.push(rotate + '°');
+      if (zoom !== 100) parts.push(zoom + '%');
+      if (panX !== 0 || panY !== 0) parts.push('↔' + panX + ' ↕' + panY);
+
+      if (parts.length === 0) return;
+
       const label = document.createElement('span');
-      label.className = 'rotate-label';
-      label.textContent = rotate + '°';
+      label.className = 'transform-label';
+      label.textContent = parts.join(' ');
 
       // Position at bottom-left of image
       const rect = img.getBoundingClientRect();
       label.style.left = (rect.left + 4) + 'px';
-      label.style.top = (rect.bottom - 36) + 'px';
+      label.style.top = (rect.bottom - 20) + 'px';
 
       labelOverlay.appendChild(label);
     });
@@ -236,7 +248,10 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
       'Ctrl+B\t\t\tBold',
       'Ctrl+I\t\t\tItalic / Alt text',
       'Ctrl+J\t\t\tFit mode',
-      'Ctrl+.\t\t\tRotate',
+      'Ctrl+.\t\t\tRotate 90°',
+      'Ctrl+[ / ]\t\tRotate ±1°',
+      'Ctrl+, / /\t\tZoom ±2%',
+      'Ctrl+Arrow\t\tPan ±2%',
       'Ctrl+Enter\t\tSave'
     ];
     alert(shortcuts.join('\n'));
@@ -418,6 +433,101 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
         updateLabels();
       }
     }
+    // Ctrl+[ and Ctrl+] for fine rotation (+/-1 degree)
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === '[' || e.key === ']')) {
+      e.preventDefault();
+      const selection = window.getSelection();
+      let img = null;
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (range.startContainer === range.endContainer &&
+            range.startContainer.nodeType === Node.ELEMENT_NODE &&
+            range.endOffset - range.startOffset === 1) {
+          const selectedNode = range.startContainer.childNodes[range.startOffset];
+          if (selectedNode && selectedNode.nodeName === 'IMG') {
+            img = selectedNode;
+          }
+        }
+      }
+      if (img) {
+        const current = parseInt(img.dataset.rotate) || 0;
+        const delta = e.key === ']' ? 1 : -1;
+        const next = ((current + delta) % 360 + 360) % 360;
+        if (next === 0) {
+          delete img.dataset.rotate;
+        } else {
+          img.dataset.rotate = next;
+        }
+        updateLabels();
+      }
+    }
+    // Ctrl+, and Ctrl+/ for zoom (-/+ 2%)
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === ',' || e.key === '/')) {
+      e.preventDefault();
+      const selection = window.getSelection();
+      let img = null;
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (range.startContainer === range.endContainer &&
+            range.startContainer.nodeType === Node.ELEMENT_NODE &&
+            range.endOffset - range.startOffset === 1) {
+          const selectedNode = range.startContainer.childNodes[range.startOffset];
+          if (selectedNode && selectedNode.nodeName === 'IMG') {
+            img = selectedNode;
+          }
+        }
+      }
+      if (img) {
+        const current = parseInt(img.dataset.zoom) || 100;
+        const delta = e.key === '/' ? 2 : -2;
+        const next = Math.max(100, Math.min(200, current + delta));
+        if (next === 100) {
+          delete img.dataset.zoom;
+        } else {
+          img.dataset.zoom = next;
+        }
+        updateLabels();
+      }
+    }
+    // Ctrl+Arrow for pan (+/- 2%)
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      const selection = window.getSelection();
+      let img = null;
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (range.startContainer === range.endContainer &&
+            range.startContainer.nodeType === Node.ELEMENT_NODE &&
+            range.endOffset - range.startOffset === 1) {
+          const selectedNode = range.startContainer.childNodes[range.startOffset];
+          if (selectedNode && selectedNode.nodeName === 'IMG') {
+            img = selectedNode;
+          }
+        }
+      }
+      if (img) {
+        const panX = parseInt(img.dataset.panX) || 0;
+        const panY = parseInt(img.dataset.panY) || 0;
+        const delta = 2;
+        let newPanX = panX;
+        let newPanY = panY;
+        if (e.key === 'ArrowLeft') newPanX = Math.max(-50, panX - delta);
+        if (e.key === 'ArrowRight') newPanX = Math.min(50, panX + delta);
+        if (e.key === 'ArrowUp') newPanY = Math.max(-50, panY - delta);
+        if (e.key === 'ArrowDown') newPanY = Math.min(50, panY + delta);
+        if (newPanX === 0) {
+          delete img.dataset.panX;
+        } else {
+          img.dataset.panX = newPanX;
+        }
+        if (newPanY === 0) {
+          delete img.dataset.panY;
+        } else {
+          img.dataset.panY = newPanY;
+        }
+        updateLabels();
+      }
+    }
     // Tab/Shift+Tab for list indent/dedent
     if (e.key === 'Tab') {
       const selection = window.getSelection();
@@ -561,6 +671,9 @@ main .container img[data-rotate] { outline: 3px solid #9933cc; }
     if (node.alt) tag += ' alt="' + node.alt.replace(/"/g, '&quot;') + '"';
     if (node.dataset.fit) tag += ' data-fit="' + node.dataset.fit + '"';
     if (node.dataset.rotate) tag += ' data-rotate="' + node.dataset.rotate + '"';
+    if (node.dataset.zoom && node.dataset.zoom !== '100') tag += ' data-zoom="' + node.dataset.zoom + '"';
+    if (node.dataset.panX && node.dataset.panX !== '0') tag += ' data-pan-x="' + node.dataset.panX + '"';
+    if (node.dataset.panY && node.dataset.panY !== '0') tag += ' data-pan-y="' + node.dataset.panY + '"';
     if (node.dataset.width) tag += ' data-width="' + node.dataset.width + '"';
     if (node.dataset.height) tag += ' data-height="' + node.dataset.height + '"';
     tag += '>';
