@@ -76,11 +76,11 @@ Ctrl+J      Cycle fit mode (image/video selected, see Fit modes below)
 Ctrl+.      Rotate image 90° clockwise (cycles: 0 -> 90 -> 180 -> 270 -> 0)
 Ctrl+[ / ]  Fine rotate image -1° / +1° (works with any rotation)
 Ctrl+, / /  Zoom out / in 2% (100% minimum, 200% maximum)
-Ctrl+Arrow  Pan image 2% in direction (range limited by zoom level)
+Ctrl+Arrow  Pan image 1% in direction (range limited by zoom level)
 Ctrl+Enter  Save (server mode only)
 
 Transforms in edit mode: Images with rotation, zoom, or pan show a purple
-outline and a label at bottom-left (e.g., "93° 110% ↔5 ↕-3"). Use View mode
+outline and a label at bottom-left (e.g., "93° 110% x5 y3"). Use View mode
 to see actual transforms applied.
 
 Selection in JS: Text selection returns content via selection.toString().

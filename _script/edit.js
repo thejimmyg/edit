@@ -83,22 +83,25 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       const panX = parseInt(img.dataset.panX) || 0;
       const panY = parseInt(img.dataset.panY) || 0;
 
-      // Build label text from non-default values
+      // Build compact single-line label from non-default values
+      // Display panY negated so up is positive
       const parts = [];
       if (rotate !== 0) parts.push(rotate + '°');
       if (zoom !== 100) parts.push(zoom + '%');
-      if (panX !== 0 || panY !== 0) parts.push('↔' + panX + ' ↕' + panY);
+      if (panX !== 0) parts.push('x' + panX);
+      if (panY !== 0) parts.push('y' + (-panY));
 
       if (parts.length === 0) return;
 
       const label = document.createElement('span');
       label.className = 'transform-label';
+      label.style.whiteSpace = 'nowrap';
       label.textContent = parts.join(' ');
 
-      // Position at bottom-left of image
+      // Position at bottom-left of image, clamped within bounds
       const rect = img.getBoundingClientRect();
       label.style.left = (rect.left + 4) + 'px';
-      label.style.top = (rect.bottom - 20) + 'px';
+      label.style.top = (rect.bottom - 36) + 'px';
 
       labelOverlay.appendChild(label);
     });
@@ -508,7 +511,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       if (img) {
         const panX = parseInt(img.dataset.panX) || 0;
         const panY = parseInt(img.dataset.panY) || 0;
-        const delta = 2;
+        const delta = 1;
         let newPanX = panX;
         let newPanY = panY;
         if (e.key === 'ArrowLeft') newPanX = Math.max(-50, panX - delta);

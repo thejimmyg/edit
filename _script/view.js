@@ -46,7 +46,7 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-d
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 main .container video { max-width: 100%; height: auto; }
-.gallery { table-layout: fixed; width: min(94vh, calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
+.gallery { table-layout: fixed; width: min(calc(100vh - 3.5rem), calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
 .gallery td { padding: 0; border: 0; vertical-align: top; }
 .gallery a { display: block; }
 .gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; object-fit: contain; }
