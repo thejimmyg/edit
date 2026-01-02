@@ -143,14 +143,15 @@ width requests 750px, prompting the browser to pick the 800px variant.
 Note: Drag-and-drop uses crypto.subtle for hashing, which requires a secure
 context (localhost or HTTPS). Access via IP address over HTTP won't work.
 
-URL fixing: When cutting/pasting or moving images in contentEditable, browsers
-convert relative paths to absolute URLs. A MutationObserver watches for src
-changes and converts absolute URLs back to relative _gallery/ paths.
-
 Gallery rows: Images and videos on the same line form a gallery row. Press
-Enter between media to create separate rows. The saved HTML preserves line
-breaks which view.js uses to build the gallery table. Mixed rows of images
-and videos are supported.
+Enter between media to create separate rows. In the DOM, each row is wrapped
+in a <p> element for consistent browser behavior. The saved HTML outputs
+media tags directly (one row per line) which view.js wraps into gallery
+tables. Mixed rows of images and videos are supported.
+
+Scroll preservation: Edit mode saves and restores scroll position when the
+DOM is cleaned (on paste, save, copy, download hover). This prevents the
+page from jumping to the top during editing.
 
 Saving:
   "Copy HTML" - copies formatted HTML to clipboard via navigator.clipboard API
@@ -160,6 +161,27 @@ Saving:
                via URL.createObjectURL(), triggers download via anchor click.
                Right-click and "Save As" to choose location.
   "View" - exits edit mode (navigates to page without ?edit)
+
+ContentEditable approach: The editor uses native contentEditable for cursor
+movement, selection, copy/paste, undo/redo, and accessibility. The tradeoff
+is inconsistent DOM across browsers and dirty paste from external sources.
+
+DOM cleaning (cleanDOM function, runs on paste and before save):
+  - Normalize tags: <b> → <strong>, <i> → <em>
+  - Unwrap unknown elements (keep children, remove wrapper)
+  - Unwrap block elements inside <li> (list content is inline)
+  - For allowed elements: remove all attributes, restore only permitted ones
+  - Merge adjacent text nodes, remove empty formatting elements
+  - Remove all <br> elements (gallery rows are now <p> elements, not BR-separated)
+  - Convert absolute _gallery/ URLs to relative paths (handles cross-page paste,
+    including poster files and size variants like HASH-800.jpg, HASH-poster.jpg)
+
+Allowed elements and attributes (ALLOWED object in edit.js):
+  h1-h6, p, ul, li    No attributes
+  a                   href only
+  strong, em          No attributes
+  img                 src, alt, data-{fit,rotate,zoom,panX,panY,width,height,hash}, class=pending
+  video               src, alt, poster, data-{fit,width,height,duration,hash}, class=pending
 
 /* DEVELOPMENT SERVER */
 
@@ -181,6 +203,16 @@ Consecutive <img> and <video> tags form a row. The script wraps them in a
 table with equal-width columns. Separate rows with any block element (p, h2,
 etc) or line breaks in the source HTML. Images and videos can be mixed in
 the same row.
+
+Scroll snapping: Gallery rows have scroll-snap-align: start with proximity
+snapping. This helps align photos with scroll positions despite browser
+scroll quantization (especially in Firefox). The scroll-margin-top accounts
+for the sticky header.
+
+Square images: Images with data-fit="square" have their wrapper constrained
+to max-height: 90vh and max-width: 90vh. On wide viewports, square images
+display at viewport height rather than filling the full table column width,
+ensuring they remain fully visible.
 
 /* MEDIA PROCESSING */
 

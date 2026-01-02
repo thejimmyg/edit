@@ -28,6 +28,7 @@
   const style = document.createElement('style');
   style.textContent = `
 html, body { margin: 0; padding: 0; }
+html {  }
 body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
@@ -46,12 +47,14 @@ main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-d
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 main .container video { max-width: 100%; height: auto; }
-.gallery { table-layout: fixed; width: min(calc(100vh - 3.5rem), calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
+.gallery { table-layout: fixed; width: min(calc(110vh - 3.5rem), calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
 .gallery td { padding: 0; border: 0; vertical-align: top; }
+.gallery tr { scroll-snap-align: start; scroll-margin-top: 3.5rem; }
 .gallery a { display: block; }
 .gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; object-fit: contain; }
 .gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
 .gallery img[data-fit="square"] { max-height: none; }
+.gallery .rotate-wrapper:has(img[data-fit="square"]) { max-height: 90vh; max-width: 90vh; margin: 0 auto; }
 .gallery video { cursor: pointer; }
 .gallery .rotate-wrapper { position: relative; overflow: hidden; width: 100%; }
 .gallery .rotate-wrapper a { position: absolute; inset: 0; }

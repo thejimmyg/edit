@@ -18,10 +18,10 @@
   style.textContent = `
 header { display: none; }
 main .container { min-height: 50vh; display: block; }
-main .container p { margin: 0.5rem 0; }
+main .container p { margin: 0.25rem 0; }
 main .container h1, main .container h2, main .container h3, main .container h4 { margin: 1rem 0 0.5rem 0; }
 main .container:focus { outline: none; }
-main .container img, main .container video { max-width: 200px; height: auto; margin: 0.25rem; vertical-align: middle; }
+main .container img, main .container video { max-width: 200px; height: auto; margin: 0.5rem; vertical-align: middle; }
 main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
 .edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; line-height: 2rem; font-size: 0.8rem; }
 .edit-bar .edit-title { font-weight: bold; }
@@ -113,6 +113,38 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   main.addEventListener('input', () => setTimeout(updateLabels, 0));
   setTimeout(updateLabels, 100);
 
+  // Wrap top-level media sequences in <p> elements for consistent row handling
+  function wrapTopLevelMedia() {
+    const children = Array.from(main.childNodes);
+    let mediaRun = [];
+
+    function flushRun() {
+      if (mediaRun.length === 0) return;
+      const p = document.createElement('p');
+      mediaRun[0].before(p);
+      for (const node of mediaRun) p.appendChild(node);
+      mediaRun = [];
+    }
+
+    for (const node of children) {
+      if (node.nodeName === 'IMG' || node.nodeName === 'VIDEO') {
+        mediaRun.push(node);
+      } else if (node.nodeName === 'BR' && mediaRun.length > 0) {
+        // BR after media = row break, flush current run and start new one
+        flushRun();
+        node.remove();
+      } else if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+        // Whitespace between media - include in run if we have media
+        if (mediaRun.length > 0) mediaRun.push(node);
+      } else {
+        // Non-media element - flush any pending media
+        flushRun();
+      }
+    }
+    flushRun();
+  }
+  wrapTopLevelMedia();
+
   // Make main editable
   main.contentEditable = 'true';
 
@@ -123,41 +155,148 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   }
   main.querySelectorAll('video').forEach(stripVideoControls);
 
-  // Convert absolute URLs back to relative _gallery/ paths
-  function fixMediaSrc(el) {
-    const src = el.getAttribute('src');
-    if (!src) return;
-    // Match absolute URL ending in _gallery/HASH.ext
-    const match = src.match(/_gallery\/([a-f0-9]{12}\.(jpg|mp4))$/);
-    if (match && src.startsWith('http')) {
-      el.setAttribute('src', '_gallery/' + match[1]);
+  // Get selected media element if exactly one is selected
+  function getSelectedMedia(types = ['IMG', 'VIDEO']) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return null;
+    const range = selection.getRangeAt(0);
+    if (range.startContainer === range.endContainer &&
+        range.startContainer.nodeType === Node.ELEMENT_NODE &&
+        range.endOffset - range.startOffset === 1) {
+      const node = range.startContainer.childNodes[range.startOffset];
+      if (node && types.includes(node.nodeName)) return node;
     }
+    return null;
   }
 
-  // Watch for new/changed media and fix URLs, strip video controls
+  // Allowed elements and their permitted attributes
+  // Elements not listed are unwrapped (children kept, wrapper removed)
+  const ALLOWED = {
+    // Block elements (no attributes allowed)
+    H1: {}, H2: {}, H3: {}, H4: {}, H5: {}, H6: {},
+    P: {},
+    UL: {},
+    LI: {},
+    // Inline elements
+    A: { attrs: ['href'] },
+    STRONG: {},
+    EM: {},
+    // Media elements
+    IMG: {
+      attrs: ['src', 'alt'],
+      data: ['fit', 'rotate', 'zoom', 'panX', 'panY', 'width', 'height', 'hash'],
+      classes: ['pending']
+    },
+    VIDEO: {
+      attrs: ['src', 'alt', 'poster'],
+      data: ['fit', 'width', 'height', 'duration', 'hash'],
+      classes: ['pending']
+    }
+  };
+
+  // Block elements that should unwrap when inside LI (LI content is inline)
+  const UNWRAP_IN_LI = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'];
+
+  // Clean DOM: normalize tags, enforce allowed elements/attributes
+  function cleanDOM(root) {
+    const scrollY = window.scrollY;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    const elements = [];
+    while (walker.nextNode()) elements.push(walker.currentNode);
+
+    for (const el of elements.reverse()) {
+      let tag = el.tagName;
+
+      // Normalize: B→STRONG, I→EM
+      if (tag === 'B' || tag === 'I') {
+        const replacement = document.createElement(tag === 'B' ? 'STRONG' : 'EM');
+        replacement.append(...el.childNodes);
+        el.replaceWith(replacement);
+        continue;
+      }
+
+      const spec = ALLOWED[tag];
+
+      // Unknown element: unwrap
+      if (!spec) {
+        el.replaceWith(...el.childNodes);
+        continue;
+      }
+
+      // Block elements inside LI: unwrap
+      if (UNWRAP_IN_LI.includes(tag) && el.closest('li')) {
+        el.replaceWith(...el.childNodes);
+        continue;
+      }
+
+      // Clean attributes: remove all, then restore allowed ones
+      const allowedAttrs = spec.attrs || [];
+      const allowedData = spec.data || [];
+      const allowedClasses = spec.classes || [];
+
+      // Save allowed values before clearing
+      const savedAttrs = {};
+      for (const attr of allowedAttrs) {
+        if (el.hasAttribute(attr)) savedAttrs[attr] = el.getAttribute(attr);
+      }
+      const savedData = {};
+      for (const key of allowedData) {
+        if (el.dataset[key] !== undefined) savedData[key] = el.dataset[key];
+      }
+      const savedClass = allowedClasses.find(c => el.classList.contains(c));
+
+      // Remove all attributes
+      while (el.attributes.length > 0) el.removeAttribute(el.attributes[0].name);
+
+      // Restore allowed attributes
+      for (const [attr, value] of Object.entries(savedAttrs)) {
+        el.setAttribute(attr, value);
+      }
+      for (const [key, value] of Object.entries(savedData)) {
+        el.dataset[key] = value;
+      }
+      if (savedClass) el.className = savedClass;
+    }
+
+    root.normalize();
+
+    // Remove all BRs - gallery rows are now separate <p> elements, no BR needed
+    root.querySelectorAll('br').forEach(br => br.remove());
+
+    root.querySelectorAll('strong:empty, em:empty, a:empty, p:empty').forEach(e => e.remove());
+
+    // Fix media URLs - convert absolute to relative _gallery/ paths
+    root.querySelectorAll('img, video').forEach(el => {
+      for (const attr of ['src', 'poster']) {
+        const val = el.getAttribute(attr);
+        if (!val) continue;
+        // Match URL containing _gallery/HASH[variant].ext anywhere in path
+        // Handles: HASH.jpg, HASH-800.jpg, HASH-poster.jpg, HASH.mp4, HASH-540p.mp4
+        const match = val.match(/_gallery\/([a-f0-9]{12}(?:-[a-z0-9]+)?\.(?:jpg|mp4))(?:\?.*)?$/);
+        if (match && !val.startsWith('_gallery/') && !val.startsWith('data:') && !val.startsWith('blob:')) {
+          el.setAttribute(attr, '_gallery/' + match[1]);
+        }
+      }
+    });
+
+    // Restore scroll position after DOM modifications
+    window.scrollTo(0, scrollY);
+  }
+
+  // Watch for new videos and strip controls (URL fixing is done in cleanDOM)
   const observer = new MutationObserver((mutations) => {
     mutations.forEach(m => {
-      // Handle added nodes
       m.addedNodes.forEach(node => {
         if (node.nodeName === 'VIDEO') {
           stripVideoControls(node);
-          fixMediaSrc(node);
-        }
-        if (node.nodeName === 'IMG') {
-          fixMediaSrc(node);
         }
         if (node.querySelectorAll) {
-          node.querySelectorAll('video').forEach(v => { stripVideoControls(v); fixMediaSrc(v); });
-          node.querySelectorAll('img').forEach(fixMediaSrc);
+          node.querySelectorAll('video').forEach(stripVideoControls);
         }
       });
-      // Handle attribute changes (e.g., src modified by paste)
-      if (m.type === 'attributes' && m.attributeName === 'src') {
-        fixMediaSrc(m.target);
-      }
     });
   });
-  observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+  observer.observe(main, { childList: true, subtree: true });
 
   // Overlay container for video selection highlights
   const videoSelectOverlay = document.createElement('div');
@@ -252,9 +391,9 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       'Ctrl+I\t\t\tItalic / Alt text',
       'Ctrl+J\t\t\tFit mode',
       'Ctrl+.\t\t\tRotate 90°',
-      'Ctrl+[ / ]\t\tRotate ±1°',
-      'Ctrl+, / /\t\tZoom ±2%',
-      'Ctrl+Arrow\t\tPan ±2%',
+      'Ctrl+[ / ]\t\t\tRotate ±1°',
+      'Ctrl+, / /\t\t\tZoom ±1%',
+      'Ctrl+Arrow\t\tPan ±1%',
       'Ctrl+Enter\t\tSave'
     ];
     alert(shortcuts.join('\n'));
@@ -270,23 +409,10 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       if (saveBtn) saveBtn.click();
       return;
     }
-    // Enter creates a new paragraph (not just a line break)
-    // Exception: when media is selected, allow default behavior for gallery row breaks
+    // Enter always creates a new paragraph (gallery rows are now <p> elements)
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        // Check if we're selecting a media element (range brackets exactly one node)
-        const isMediaSelected = range.startContainer === range.endContainer &&
-              range.startContainer.nodeType === Node.ELEMENT_NODE &&
-              range.endOffset - range.startOffset === 1 &&
-              (range.startContainer.childNodes[range.startOffset]?.nodeName === 'IMG' ||
-               range.startContainer.childNodes[range.startOffset]?.nodeName === 'VIDEO');
-        if (!isMediaSelected) {
-          e.preventDefault();
-          document.execCommand('insertParagraph');
-        }
-      }
+      e.preventDefault();
+      document.execCommand('insertParagraph');
     }
     // Ctrl+number for headings/paragraph
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -336,65 +462,27 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
         document.execCommand('bold');
       }
       // Ctrl+I for italic/em or image/video alt text
-      // Selection API: text selection has toString(), media selection brackets the node
       if (key === 'i') {
         e.preventDefault();
-        const selection = window.getSelection();
-        const text = selection.toString();
-
-        // Check if media is selected (range brackets exactly one element node)
-        let media = null;
-        if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          if (range.startContainer === range.endContainer &&
-              range.startContainer.nodeType === Node.ELEMENT_NODE &&
-              range.endOffset - range.startOffset === 1) {
-            const selectedNode = range.startContainer.childNodes[range.startOffset];
-            if (selectedNode && (selectedNode.nodeName === 'IMG' || selectedNode.nodeName === 'VIDEO')) {
-              media = selectedNode;
-            }
-          }
-        }
-
+        const media = getSelectedMedia();
         if (media) {
-          // Media selected: edit alt text
           const label = media.nodeName === 'IMG' ? 'Image' : 'Video';
           const alt = prompt(label + ' alt text:', media.alt || '');
           if (alt !== null) {
             media.alt = alt;
           }
-        } else if (text) {
-          // Text selected: apply italic/em
+        } else if (window.getSelection().toString()) {
           document.execCommand('italic');
         }
       }
       // Ctrl+J for media fit mode toggle
       if (key === 'j') {
         e.preventDefault();
-        const selection = window.getSelection();
-
-        // Check if media is selected
-        let media = null;
-        if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          if (range.startContainer === range.endContainer &&
-              range.startContainer.nodeType === Node.ELEMENT_NODE &&
-              range.endOffset - range.startOffset === 1) {
-            const selectedNode = range.startContainer.childNodes[range.startOffset];
-            if (selectedNode && (selectedNode.nodeName === 'IMG' || selectedNode.nodeName === 'VIDEO')) {
-              media = selectedNode;
-            }
-          }
-        }
-
+        const media = getSelectedMedia();
         if (media) {
-          // Cycle through fit modes: none -> toowide -> tootall -> square -> none
           const currentFit = media.dataset.fit || 'none';
           const fitModes = ['none', 'toowide', 'tootall', 'square'];
-          const currentIndex = fitModes.indexOf(currentFit);
-          const nextIndex = (currentIndex + 1) % fitModes.length;
-          const nextFit = fitModes[nextIndex];
-
+          const nextFit = fitModes[(fitModes.indexOf(currentFit) + 1) % fitModes.length];
           if (nextFit === 'none') {
             delete media.dataset.fit;
           } else {
@@ -407,27 +495,9 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     // Ctrl+. for image rotation
     if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === '.') {
       e.preventDefault();
-      const selection = window.getSelection();
-
-      // Check if an image is selected (rotation only for images, not video)
-      let img = null;
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        if (range.startContainer === range.endContainer &&
-            range.startContainer.nodeType === Node.ELEMENT_NODE &&
-            range.endOffset - range.startOffset === 1) {
-          const selectedNode = range.startContainer.childNodes[range.startOffset];
-          if (selectedNode && selectedNode.nodeName === 'IMG') {
-            img = selectedNode;
-          }
-        }
-      }
-
+      const img = getSelectedMedia(['IMG']);
       if (img) {
-        // Cycle through rotations: 0 -> 90 -> 180 -> 270 -> 0
-        const currentRotate = parseInt(img.dataset.rotate) || 0;
-        const nextRotate = (currentRotate + 90) % 360;
-
+        const nextRotate = ((parseInt(img.dataset.rotate) || 0) + 90) % 360;
         if (nextRotate === 0) {
           delete img.dataset.rotate;
         } else {
@@ -439,23 +509,10 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     // Ctrl+[ and Ctrl+] for fine rotation (+/-1 degree)
     if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === '[' || e.key === ']')) {
       e.preventDefault();
-      const selection = window.getSelection();
-      let img = null;
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        if (range.startContainer === range.endContainer &&
-            range.startContainer.nodeType === Node.ELEMENT_NODE &&
-            range.endOffset - range.startOffset === 1) {
-          const selectedNode = range.startContainer.childNodes[range.startOffset];
-          if (selectedNode && selectedNode.nodeName === 'IMG') {
-            img = selectedNode;
-          }
-        }
-      }
+      const img = getSelectedMedia(['IMG']);
       if (img) {
         const current = parseInt(img.dataset.rotate) || 0;
-        const delta = e.key === ']' ? 1 : -1;
-        const next = ((current + delta) % 360 + 360) % 360;
+        const next = ((current + (e.key === ']' ? 1 : -1)) % 360 + 360) % 360;
         if (next === 0) {
           delete img.dataset.rotate;
         } else {
@@ -467,23 +524,10 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     // Ctrl+, and Ctrl+/ for zoom (-/+ 2%)
     if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === ',' || e.key === '/')) {
       e.preventDefault();
-      const selection = window.getSelection();
-      let img = null;
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        if (range.startContainer === range.endContainer &&
-            range.startContainer.nodeType === Node.ELEMENT_NODE &&
-            range.endOffset - range.startOffset === 1) {
-          const selectedNode = range.startContainer.childNodes[range.startOffset];
-          if (selectedNode && selectedNode.nodeName === 'IMG') {
-            img = selectedNode;
-          }
-        }
-      }
+      const img = getSelectedMedia(['IMG']);
       if (img) {
         const current = parseInt(img.dataset.zoom) || 100;
-        const delta = e.key === '/' ? 2 : -2;
-        const next = Math.max(100, Math.min(200, current + delta));
+        const next = Math.max(100, Math.min(200, current + (e.key === '/' ? 2 : -2)));
         if (next === 100) {
           delete img.dataset.zoom;
         } else {
@@ -492,41 +536,26 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
         updateLabels();
       }
     }
-    // Ctrl+Arrow for pan (+/- 2%)
+    // Ctrl+Arrow for pan (+/- 1%)
     if (e.ctrlKey && !e.shiftKey && !e.altKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
       e.preventDefault();
-      const selection = window.getSelection();
-      let img = null;
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        if (range.startContainer === range.endContainer &&
-            range.startContainer.nodeType === Node.ELEMENT_NODE &&
-            range.endOffset - range.startOffset === 1) {
-          const selectedNode = range.startContainer.childNodes[range.startOffset];
-          if (selectedNode && selectedNode.nodeName === 'IMG') {
-            img = selectedNode;
-          }
-        }
-      }
+      const img = getSelectedMedia(['IMG']);
       if (img) {
-        const panX = parseInt(img.dataset.panX) || 0;
-        const panY = parseInt(img.dataset.panY) || 0;
-        const delta = 1;
-        let newPanX = panX;
-        let newPanY = panY;
-        if (e.key === 'ArrowLeft') newPanX = Math.max(-50, panX - delta);
-        if (e.key === 'ArrowRight') newPanX = Math.min(50, panX + delta);
-        if (e.key === 'ArrowUp') newPanY = Math.max(-50, panY - delta);
-        if (e.key === 'ArrowDown') newPanY = Math.min(50, panY + delta);
-        if (newPanX === 0) {
+        let panX = parseInt(img.dataset.panX) || 0;
+        let panY = parseInt(img.dataset.panY) || 0;
+        if (e.key === 'ArrowLeft') panX = Math.max(-50, panX - 1);
+        if (e.key === 'ArrowRight') panX = Math.min(50, panX + 1);
+        if (e.key === 'ArrowUp') panY = Math.max(-50, panY - 1);
+        if (e.key === 'ArrowDown') panY = Math.min(50, panY + 1);
+        if (panX === 0) {
           delete img.dataset.panX;
         } else {
-          img.dataset.panX = newPanX;
+          img.dataset.panX = panX;
         }
-        if (newPanY === 0) {
+        if (panY === 0) {
           delete img.dataset.panY;
         } else {
-          img.dataset.panY = newPanY;
+          img.dataset.panY = panY;
         }
         updateLabels();
       }
@@ -549,6 +578,11 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
         node = node.parentNode;
       }
     }
+  });
+
+  // Clean pasted content after browser completes paste
+  main.addEventListener('paste', () => {
+    setTimeout(() => { cleanDOM(main); updateLabels(); }, 0);
   });
 
   // Compute SHA256 hash of file, return first 12 hex chars
@@ -721,8 +755,8 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
           result += imgTag(node);
         } else if (tag === 'video') {
           result += videoTag(node);
-        } else if (tag === 'br') {
-          // ignore
+        } else if (tag === 'ul') {
+          // skip (handled separately in formatList)
         } else {
           result += inlineContent(node); // recurse into spans, etc.
         }
@@ -739,22 +773,11 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     const ind = '    '.repeat(indent);
     let result = '<ul>\n';
     for (const li of items) {
-      result += ind + '<li>';
-      for (const node of li.childNodes) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          result += node.textContent.trim();
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const tag = node.tagName.toLowerCase();
-          if (tag === 'a') {
-            result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
-          } else if (tag === 'ul') {
-            result += '\n' + formatList(node, indent + 1);
-          } else if (tag === 'img') {
-            result += imgTag(node);
-          } else if (tag === 'video') {
-            result += videoTag(node);
-          }
-        }
+      result += ind + '<li>' + inlineContent(li);
+      // Check for nested list (inlineContent skips it)
+      const nestedUl = li.querySelector(':scope > ul');
+      if (nestedUl) {
+        result += '\n' + formatList(nestedUl, indent + 1);
       }
       result += '</li>\n';
     }
@@ -762,7 +785,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     return result;
   }
 
-  // Output images/videos from a container, respecting BR elements as row breaks
+  // Output images/videos from a container (each <p> is one row)
   function formatMedia(container) {
     let result = '';
     for (const node of container.childNodes) {
@@ -770,10 +793,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
         result += imgTag(node);
       } else if (node.nodeName === 'VIDEO') {
         result += videoTag(node);
-      } else if (node.nodeName === 'BR') {
-        result += '\n';
       }
-      // Ignore other nodes (whitespace text, etc.)
     }
     return result;
   }
@@ -781,59 +801,44 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   // Convert DOM to formatted HTML
   function formatElement(el) {
     let result = '';
-    let lastWasMedia = false;
 
     for (const node of el.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent.trim();
         if (text) {
           result += '<p>\n    ' + formatText(text) + '\n</p>';
-          lastWasMedia = false;
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const tag = node.tagName.toLowerCase();
 
         if (tag === 'img') {
+          // Top-level media (legacy support)
           result += imgTag(node);
-          lastWasMedia = true;
         } else if (tag === 'video') {
           result += videoTag(node);
-          lastWasMedia = true;
-        } else if (tag === 'br') {
-          // BR after media = new row
-          if (lastWasMedia) {
-            result += '\n';
-          }
         } else if (/^h[1-6]$/.test(tag)) {
           const text = node.textContent.trim();
           if (text) {
             result += '<' + tag + '>\n    ' + formatText(text) + '\n</' + tag + '>';
           }
-          lastWasMedia = false;
         } else if (tag === 'p' || tag === 'div') {
           // Check if contains only media (no text content)
           const text = node.textContent.trim();
           const media = node.querySelectorAll('img, video');
           if (!text && media.length > 0) {
-            // Output media with BR handling, then add newline for next row
+            // Media-only row: output media tags followed by newline
             result += formatMedia(node);
             result += '\n';
-            lastWasMedia = true;
           } else {
             const content = inlineContent(node).trim();
             if (content) {
               result += '<p>\n    ' + formatText(content) + '\n</p>';
             }
-            lastWasMedia = false;
           }
         } else if (tag === 'ul') {
           result += formatList(node);
-          lastWasMedia = false;
         } else if (tag === 'a') {
           result += '<a href="' + (node.getAttribute('href') || '') + '">' + node.textContent + '</a>';
-          lastWasMedia = false;
-        } else {
-          lastWasMedia = false;
         }
       }
     }
@@ -843,6 +848,8 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
 
   // Generate complete HTML
   function generateHTML() {
+    cleanDOM(main);
+    updateLabels();
     const content = formatElement(main);
     return '<!DOCTYPE html><script src="' + root + '_script/view.js"><\/script>' +
       '<noscript><p><a href="' + root + 'sitemap/index.html">Sitemap</a></p></noscript>' +
