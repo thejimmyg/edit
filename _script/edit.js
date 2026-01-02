@@ -49,6 +49,9 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
 .fit-label.tootall { background: rgba(0, 102, 204, 0.85); color: white; }
 .fit-label.square { background: rgba(51, 153, 51, 0.85); color: white; }
 .transform-label { background: rgba(153, 51, 204, 0.85); color: white; }
+.fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.35); backdrop-filter: saturate(300%) blur(20px); -webkit-backdrop-filter: saturate(300%) blur(20px); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.2s, transform 0.2s; color: black; }
+.fab:hover { transform: scale(1.1); }
+.fab.visible { display: flex; }
 
 /* Dark mode for edit mode */
 [data-theme="dark"] .edit-bar { background: rgba(0,0,0,0.52); }
@@ -60,6 +63,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
 [data-theme="dark"] main .container img.pending,
 [data-theme="dark"] main .container video.pending { border-color: #666; }
 [data-theme="dark"] .drop-hint { background: rgba(0,100,200,0.15); }
+[data-theme="dark"] .fab { background: rgba(0,0,0,0.35); color: #ccc; }
 `;
   document.head.appendChild(style);
 
@@ -941,5 +945,29 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       }
     });
   }
+
+  // Floating action button (FAB) - scroll to top
+  const fab = document.createElement('button');
+  fab.className = 'fab';
+  fab.setAttribute('aria-label', 'Scroll to top');
+  fab.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15V5M5 10l5-5 5 5"/></svg>';
+  fab.onclick = function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  document.body.appendChild(fab);
+
+  // Show/hide FAB based on scroll
+  function updateFAB() {
+    const hasScrollbar = document.body.scrollHeight > window.innerHeight;
+    const scrolledDown = window.scrollY > 200;
+    if (hasScrollbar && scrolledDown) {
+      fab.classList.add('visible');
+    } else {
+      fab.classList.remove('visible');
+    }
+  }
+  window.addEventListener('scroll', updateFAB);
+  window.addEventListener('resize', updateFAB);
+  updateFAB();
 
 })();

@@ -52,7 +52,9 @@
   style.textContent = `
 html, body { margin: 0; padding: 0; }
 html {  }
-body { background: #eee; color: #000; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
+body { background: #fff; }
+main { background: #eee; color: #000; }
+body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
@@ -66,34 +68,35 @@ header a, header a:visited, header a:hover { color: black; }
 header a, header a:visited { text-decoration: none; }
 header a:hover { text-decoration: underline; }
 header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
-footer { text-align: right; }
-footer .container { padding-top: 1rem; padding-bottom: 1rem; }
-footer a { color: inherit; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
+.fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.35); backdrop-filter: saturate(300%) blur(20px); -webkit-backdrop-filter: saturate(300%) blur(20px); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.2s, transform 0.2s; color: black; }
+.fab:hover { transform: scale(1.1); }
+.fab.visible { display: flex; }
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
 main .container video { max-width: 100%; height: auto; }
 .gallery { table-layout: fixed; width: min(calc(110vh - 3.5rem), calc(100% + ${containerPad * 2}rem)); border-spacing: ${containerPad}rem; margin: 0.5rem -${containerPad}rem; }
 .gallery td { padding: 0; border: 0; vertical-align: top; }
-.gallery tr { scroll-snap-align: start; scroll-margin-top: 3.5rem; }
 .gallery a { display: block; }
-.gallery img, .gallery video { display: block; width: 100%; max-height: 90vh; object-fit: contain; }
+.gallery img, .gallery video { display: block; width: 100%; max-height: 85vh; object-fit: contain; }
 .gallery img[data-fit="tootall"], .gallery img[data-fit="toowide"] { width: auto; max-width: 100%; }
 .gallery img[data-fit="square"] { max-height: none; }
-.gallery .rotate-wrapper:has(img[data-fit="square"]) { max-height: 90vh; max-width: 90vh; margin: 0 auto; }
+.gallery .rotate-wrapper:has(img[data-fit="square"]) { max-height: 85vh; max-width: 85vh; margin: 0 auto; }
 .gallery video { cursor: pointer; }
 .gallery .rotate-wrapper { position: relative; overflow: hidden; width: 100%; }
 .gallery .rotate-wrapper a { position: absolute; inset: 0; }
 .gallery .rotate-wrapper img { position: absolute; left: 50%; top: 50%; max-height: none; max-width: none; }
 
 /* Dark mode - inverted color scheme */
-[data-theme="dark"] body { background: #111; color: #ccc; }
+[data-theme="dark"] body { background: #000; }
+[data-theme="dark"] main { background: #111; color: #ccc; }
 [data-theme="dark"] header { background: rgba(0,0,0,0.52); }
 [data-theme="dark"] header a,
 [data-theme="dark"] header a:visited,
 [data-theme="dark"] header a:hover,
 [data-theme="dark"] header span { color: #ccc; }
 [data-theme="dark"] header .theme-toggle { color: #ccc; }
+[data-theme="dark"] .fab { background: rgba(0,0,0,0.35); color: #ccc; }
 `;
   document.head.appendChild(style);
 
@@ -205,25 +208,27 @@ main .container video { max-width: 100%; height: auto; }
     editLink.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 1l2 2-9 9-2.5.5.5-2.5L11 1z"/></svg>';
     header.appendChild(editLink);
 
-    // Footer with container and Top link (hidden initially)
-    const footer = document.createElement('footer');
-    const footerContainer = document.createElement('div');
-    footerContainer.className = 'container';
-    const topLink = document.createElement('a');
-    topLink.href = '#';
-    topLink.textContent = 'Top \u2191';
-    topLink.style.display = 'none';
-    footerContainer.appendChild(topLink);
-    footer.appendChild(footerContainer);
+    // Floating action button (FAB) - scroll to top
+    const fab = document.createElement('button');
+    fab.className = 'fab';
+    fab.setAttribute('aria-label', 'Scroll to top');
+    fab.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15V5M5 10l5-5 5 5"/></svg>';
+    fab.onclick = function() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-    // Show/hide Top link based on scroll
-    function updateTopLink() {
+    // Show/hide FAB based on scroll
+    function updateFAB() {
       const hasScrollbar = document.body.scrollHeight > window.innerHeight;
-      const atTop = window.scrollY < 50;
-      topLink.style.display = (hasScrollbar && !atTop) ? '' : 'none';
+      const scrolledDown = window.scrollY > 200;
+      if (hasScrollbar && scrolledDown) {
+        fab.classList.add('visible');
+      } else {
+        fab.classList.remove('visible');
+      }
     }
-    window.addEventListener('scroll', updateTopLink);
-    window.addEventListener('resize', updateTopLink);
+    window.addEventListener('scroll', updateFAB);
+    window.addEventListener('resize', updateFAB);
 
     // Check if node is media (image or video)
     function isMedia(node) {
@@ -591,9 +596,9 @@ main .container video { max-width: 100%; height: auto; }
     document.body.innerHTML = '';
     document.body.appendChild(header);
     document.body.appendChild(main);
-    if (!editMode) document.body.appendChild(footer);
+    if (!editMode) document.body.appendChild(fab);
 
-    updateTopLink();
+    updateFAB();
 
     // Load edit script if in edit mode
     if (editMode) {

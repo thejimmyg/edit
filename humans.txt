@@ -15,13 +15,22 @@ Pages contain:
   3. The body content (starting with an <h1>)
 
 The script injects viewport meta, inline styles, header (breadcrumbs + section
-nav), wraps content in <main>, and adds a footer with Top link.
+nav), and wraps content in <main>.
 
 /* LAYOUT */
 
 Single column, full width, browser defaults. Sticky header with backdrop blur.
 
 Breadcrumbs and section nav both left-aligned with gap between.
+
+Dark mode: Theme toggle (sun/moon icon) in header switches between light and
+dark themes. Respects system color scheme preference (prefers-color-scheme) on
+first visit. User preference persists in localStorage. Dark mode uses inverted
+color scheme with reduced contrast (#ccc text on #111 background).
+
+Floating action button (FAB): Circular button in bottom-right corner appears
+when scrolled down >200px. Scrolls smoothly to top on click. Uses same frosted
+glass styling as header with backdrop-filter blur.
 
 /* NAVIGATION */
 
@@ -38,9 +47,6 @@ with current page as plain text.
 Unlisted pages: Pages not in the sitemap inherit navigation from their
 nearest ancestor that is in the sitemap. For example, individual blog posts
 show the same navigation as the blog section page.
-
-Footer: Right-aligned Top link, only visible when page is scrollable and
-not at top.
 
 /* SITEMAP */
 
@@ -148,6 +154,11 @@ Enter between media to create separate rows. In the DOM, each row is wrapped
 in a <p> element for consistent browser behavior. The saved HTML outputs
 media tags directly (one row per line) which view.js wraps into gallery
 tables. Mixed rows of images and videos are supported.
+
+Scroll snapping: Previously attempted using CSS scroll-snap-type on gallery
+rows with viewport-height portrait/square images. Removed due to Firefox
+scroll-trap issues where the browser would prevent scrolling past certain
+snap points, particularly with square-fit images at the end of galleries.
 
 Scroll preservation: Edit mode saves and restores scroll position when the
 DOM is cleaned (on paste, save, copy, download hover). This prevents the
