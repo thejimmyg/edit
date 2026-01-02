@@ -1,4 +1,27 @@
 (function() {
+  // Theme management - runs early to prevent flash
+  function getInitialTheme() {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  // Apply theme immediately
+  applyTheme(getInitialTheme());
+
+  // Make toggleTheme available globally
+  window.toggleTheme = toggleTheme;
+
   const scripts = document.getElementsByTagName('script');
   const src = scripts[scripts.length - 1].getAttribute('src');
   const expectedSuffix = '_script/view.js';
@@ -29,12 +52,14 @@
   style.textContent = `
 html, body { margin: 0; padding: 0; }
 html {  }
-body { background: #eee; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
+body { background: #eee; color: #000; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
 header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; }
-header .edit-link { margin-left: auto; }
+header .theme-toggle { margin-left: auto; cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; }
+header .theme-toggle svg { transform: translateY(2px); }
+header .edit-link { margin-left: 0; }
 header .edit-link svg { transform: translateY(2px); }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
@@ -43,6 +68,7 @@ header a:hover { text-decoration: underline; }
 header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
 footer { text-align: right; }
 footer .container { padding-top: 1rem; padding-bottom: 1rem; }
+footer a { color: inherit; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
 main .container > *:not(.gallery) { align-self: stretch; }
 main .container > p { margin: 0; padding: 0.5rem 0 0.5rem 0; }
@@ -59,6 +85,15 @@ main .container video { max-width: 100%; height: auto; }
 .gallery .rotate-wrapper { position: relative; overflow: hidden; width: 100%; }
 .gallery .rotate-wrapper a { position: absolute; inset: 0; }
 .gallery .rotate-wrapper img { position: absolute; left: 50%; top: 50%; max-height: none; max-width: none; }
+
+/* Dark mode - inverted color scheme */
+[data-theme="dark"] body { background: #111; color: #ccc; }
+[data-theme="dark"] header { background: rgba(0,0,0,0.52); }
+[data-theme="dark"] header a,
+[data-theme="dark"] header a:visited,
+[data-theme="dark"] header a:hover,
+[data-theme="dark"] header span { color: #ccc; }
+[data-theme="dark"] header .theme-toggle { color: #ccc; }
 `;
   document.head.appendChild(style);
 
@@ -141,6 +176,27 @@ main .container video { max-width: 100%; height: auto; }
     header.appendChild(siteTitle);
     if (crumbs.length > 0) header.appendChild(breadcrumbNav);
     header.appendChild(sectionNav);
+
+    // Theme toggle button (sun/moon icon)
+    const themeToggle = document.createElement('button');
+    themeToggle.className = 'theme-toggle';
+    themeToggle.setAttribute('aria-label', 'Toggle theme');
+    themeToggle.onclick = toggleTheme;
+    function updateThemeIcon() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      // Sun icon for dark mode (click to go light), moon icon for light mode (click to go dark)
+      themeToggle.innerHTML = isDark
+        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="2"/><line x1="8" y1="14" x2="8" y2="15"/><line x1="1" y1="8" x2="2" y2="8"/><line x1="14" y1="8" x2="15" y2="8"/><line x1="2.5" y1="2.5" x2="3.2" y2="3.2"/><line x1="12.8" y1="12.8" x2="13.5" y2="13.5"/><line x1="12.8" y1="2.5" x2="13.5" y2="3.2"/><line x1="2.5" y1="12.8" x2="3.2" y2="13.5"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 5.3 14A6.5 6.5 0 0 1 5.3 2 8 8 0 0 0 8 0z"/></svg>';
+    }
+    updateThemeIcon();
+    // Re-update icon when theme changes
+    const originalToggle = window.toggleTheme;
+    window.toggleTheme = function() {
+      originalToggle();
+      updateThemeIcon();
+    };
+    header.appendChild(themeToggle);
 
     // Edit link on far right (pencil icon)
     const editLink = document.createElement('a');
