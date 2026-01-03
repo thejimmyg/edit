@@ -60,9 +60,8 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
 header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; }
 header .theme-toggle { margin-left: auto; cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; }
-header .theme-toggle svg { transform: translateY(2px); }
-header .edit-link { margin-left: 0; }
-header .edit-link svg { transform: translateY(2px); }
+header .new-page { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; }
+header .edit-link { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; text-decoration: none; }
 header .site-title { font-weight: bold; }
 header a, header a:visited, header a:hover { color: black; }
 header a, header a:visited { text-decoration: none; }
@@ -95,7 +94,9 @@ main .container video { max-width: 100%; height: auto; }
 [data-theme="dark"] header a:visited,
 [data-theme="dark"] header a:hover,
 [data-theme="dark"] header span { color: #ccc; }
-[data-theme="dark"] header .theme-toggle { color: #ccc; }
+[data-theme="dark"] header .theme-toggle,
+[data-theme="dark"] header .new-page,
+[data-theme="dark"] header .edit-link { color: #ccc; }
 [data-theme="dark"] .fab { background: rgba(0,0,0,0.35); color: #ccc; }
 `;
   document.head.appendChild(style);
@@ -184,29 +185,98 @@ main .container video { max-width: 100%; height: auto; }
     const themeToggle = document.createElement('button');
     themeToggle.className = 'theme-toggle';
     themeToggle.setAttribute('aria-label', 'Toggle theme');
-    themeToggle.onclick = toggleTheme;
+    themeToggle.setAttribute('title', 'Toggle dark/light theme');
     function updateThemeIcon() {
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       // Sun icon for dark mode (click to go light), moon icon for light mode (click to go dark)
       themeToggle.innerHTML = isDark
         ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="2"/><line x1="8" y1="14" x2="8" y2="15"/><line x1="1" y1="8" x2="2" y2="8"/><line x1="14" y1="8" x2="15" y2="8"/><line x1="2.5" y1="2.5" x2="3.2" y2="3.2"/><line x1="12.8" y1="12.8" x2="13.5" y2="13.5"/><line x1="12.8" y1="2.5" x2="13.5" y2="3.2"/><line x1="2.5" y1="12.8" x2="3.2" y2="13.5"/></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 5.3 14A6.5 6.5 0 0 1 5.3 2 8 8 0 0 0 8 0z"/></svg>';
+        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8.77a6.5 6.5 0 1 1-7.27-7.27A5.5 5.5 0 1 0 14 8.77z"/></svg>';
     }
     updateThemeIcon();
-    // Re-update icon when theme changes
-    const originalToggle = window.toggleTheme;
-    window.toggleTheme = function() {
-      originalToggle();
+    themeToggle.onclick = function() {
+      toggleTheme();
       updateThemeIcon();
     };
     header.appendChild(themeToggle);
 
-    // Edit link on far right (pencil icon)
-    const editLink = document.createElement('a');
-    editLink.href = location.pathname + '?edit';
-    editLink.className = 'edit-link';
-    editLink.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 1l2 2-9 9-2.5.5.5-2.5L11 1z"/></svg>';
-    header.appendChild(editLink);
+    // New page button (+ icon) - only show when not on file:// protocol
+    if (location.protocol !== 'file:') {
+      const newPageBtn = document.createElement('button');
+      newPageBtn.className = 'new-page';
+      newPageBtn.setAttribute('aria-label', 'Create new page');
+      newPageBtn.setAttribute('title', 'Create new page');
+      newPageBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>';
+      newPageBtn.onclick = async function() {
+        // Get current directory (remove /index.html if present)
+        const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '');
+        const defaultPath = currentDir || '/';
+
+        const newPath = prompt('Enter new page path:\nExample: "' + defaultPath + '/new-page"', defaultPath + '/');
+        if (!newPath) return;
+
+        // Validate path
+        const trimmed = newPath.trim();
+        if (!trimmed) {
+          alert('Path cannot be empty');
+          return;
+        }
+
+        // Check if same as current path
+        const normalizedNew = trimmed.replace('/index.html', '').replace(/\/$/, '');
+        if (normalizedNew === currentDir) {
+          alert('New path cannot be the same as the current page');
+          return;
+        }
+
+        // Check for leading underscore in any path segment
+        const segments = trimmed.split('/').filter(s => s);
+        if (segments.some(seg => seg.startsWith('_'))) {
+          alert('Path segments cannot start with underscore (_)');
+          return;
+        }
+
+        // Check for path traversal attempts
+        if (trimmed.includes('..')) {
+          alert('Path cannot contain ".." (parent directory references)');
+          return;
+        }
+
+        // Send POST request to /new endpoint
+        try {
+          const response = await fetch('/new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              newPath: trimmed
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            // Redirect to edit mode for new page
+            window.location.href = result.newPagePath + '?edit';
+          } else {
+            const error = await response.text();
+            alert('Error creating page: ' + error);
+          }
+        } catch (err) {
+          alert('Failed to create page: ' + err.message);
+        }
+      };
+      header.appendChild(newPageBtn);
+    }
+
+    // Edit button on far right (pencil icon)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'edit-link';
+    editBtn.setAttribute('aria-label', 'Edit page');
+    editBtn.setAttribute('title', 'Edit page');
+    editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M11 1l2 2-9 9-2.5.5.5-2.5L11 1z"/></svg>';
+    editBtn.onclick = function() {
+      window.location.href = location.pathname + '?edit';
+    };
+    header.appendChild(editBtn);
 
     // Floating action button (FAB) - scroll to top
     const fab = document.createElement('button');

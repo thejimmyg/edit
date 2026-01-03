@@ -26,17 +26,17 @@ main .container img.pending, main .container video.pending { opacity: 0.6; borde
 .edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; line-height: 2rem; font-size: 0.8rem; }
 .edit-bar .edit-title { font-weight: bold; }
 .edit-bar .theme-toggle { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
-.edit-bar .theme-toggle svg { transform: translateY(2px); }
+.edit-bar .new-page { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
+.edit-bar .edit-view { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
 .edit-bar a { color: black; text-decoration: none; margin-left: 1rem; cursor: pointer; display: inline-flex; align-items: center; }
 .edit-bar a:hover { text-decoration: underline; }
-.edit-bar button { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin-left: 1rem; }
-.edit-bar button:hover { background: #e0e0e0; }
+.edit-bar button#edit-save { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin-left: 1rem; }
+.edit-bar button#edit-save:hover { background: #e0e0e0; }
 #edit-status { color: #080; margin-right: 0.5rem; min-width: 3rem; }
 @media (max-width: 768px) {
   .edit-bar { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
-  .edit-bar button { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+  .edit-bar button#edit-save { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
   .edit-bar a { margin-left: 0.5rem; }
-  .edit-bar .theme-toggle { margin-left: 0.5rem; }
 }
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
@@ -57,9 +57,11 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
 [data-theme="dark"] .edit-bar { background: rgba(0,0,0,0.52); }
 [data-theme="dark"] .edit-bar a,
 [data-theme="dark"] .edit-bar .edit-title,
-[data-theme="dark"] .edit-bar .theme-toggle { color: #ccc; }
-[data-theme="dark"] .edit-bar button { background: #222; color: #ccc; border-color: #555; }
-[data-theme="dark"] .edit-bar button:hover { background: #333; }
+[data-theme="dark"] .edit-bar .theme-toggle,
+[data-theme="dark"] .edit-bar .new-page,
+[data-theme="dark"] .edit-bar .edit-view { color: #ccc; }
+[data-theme="dark"] .edit-bar button#edit-save { background: #222; color: #ccc; border-color: #555; }
+[data-theme="dark"] .edit-bar button#edit-save:hover { background: #333; }
 [data-theme="dark"] main .container img.pending,
 [data-theme="dark"] main .container video.pending { border-color: #666; }
 [data-theme="dark"] .drop-hint { background: rgba(0,100,200,0.15); }
@@ -297,6 +299,32 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       }
     });
 
+    // Fix local links - ensure they end in /index.html for file:// protocol compatibility
+    root.querySelectorAll('a[href]').forEach(el => {
+      const href = el.getAttribute('href');
+      if (!href) return;
+
+      // Skip if not a local link (has protocol, starts with #, or external)
+      if (href.startsWith('http://') || href.startsWith('https://') ||
+          href.startsWith('#') || href.startsWith('mailto:') ||
+          href.startsWith('data:') || href.startsWith('blob:')) {
+        return;
+      }
+
+      // Skip if already ends with .html or is a file
+      if (href.endsWith('.html') || href.match(/\.[a-z0-9]+$/i)) {
+        return;
+      }
+
+      // If it's a directory path (ends with / or has no extension), ensure it ends with /index.html
+      if (href.endsWith('/')) {
+        el.setAttribute('href', href + 'index.html');
+      } else if (!href.includes('.')) {
+        // Path without extension - add /index.html
+        el.setAttribute('href', href + '/index.html');
+      }
+    });
+
     // Restore scroll position after DOM modifications
     window.scrollTo(0, scrollY);
   }
@@ -379,8 +407,9 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       <a id="edit-download" href="#" download="index.html">Download</a>
       <a id="edit-copy">Copy</a>
       ${location.protocol !== 'file:' ? '<button id="edit-save">Save</button>' : ''}
-      <button class="theme-toggle" aria-label="Toggle theme"></button>
-      <a id="edit-view" href="${location.pathname}" title="Exit edit mode"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2l-10 10"/></svg></a>
+      <button class="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light theme"></button>
+      ${location.protocol !== 'file:' ? '<button class="new-page" aria-label="Create new page" title="Create new page"></button>' : ''}
+      <button class="edit-view" aria-label="Exit edit mode" title="Exit edit mode"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2l-10 10"/></svg></button>
     </div>
   `;
 
@@ -393,7 +422,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     // Sun icon for dark mode (click to go light), moon icon for light mode (click to go dark)
     themeToggle.innerHTML = isDark
       ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="2"/><line x1="8" y1="14" x2="8" y2="15"/><line x1="1" y1="8" x2="2" y2="8"/><line x1="14" y1="8" x2="15" y2="8"/><line x1="2.5" y1="2.5" x2="3.2" y2="3.2"/><line x1="12.8" y1="12.8" x2="13.5" y2="13.5"/><line x1="12.8" y1="2.5" x2="13.5" y2="3.2"/><line x1="2.5" y1="12.8" x2="3.2" y2="13.5"/></svg>'
-      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 5.3 14A6.5 6.5 0 0 1 5.3 2 8 8 0 0 0 8 0z"/></svg>';
+      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8.77a6.5 6.5 0 1 1-7.27-7.27A5.5 5.5 0 1 0 14 8.77z"/></svg>';
   }
   updateThemeIcon();
   themeToggle.onclick = function() {
@@ -403,14 +432,80 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     }
   };
 
+  // Setup new page button
+  const newPageBtn = bar.querySelector('.new-page');
+  if (newPageBtn) {
+    newPageBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>';
+    newPageBtn.onclick = async function() {
+      // Get current directory (remove /index.html if present)
+      const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '');
+      const defaultPath = currentDir || '/';
+
+      const newPath = prompt('Enter new page path:\nExample: "' + defaultPath + '/new-page"', defaultPath + '/');
+      if (!newPath) return;
+
+      // Validate path
+      const trimmed = newPath.trim();
+      if (!trimmed) {
+        alert('Path cannot be empty');
+        return;
+      }
+
+      // Check if same as current path
+      const normalizedNew = trimmed.replace('/index.html', '').replace(/\/$/, '');
+      if (normalizedNew === currentDir) {
+        alert('New path cannot be the same as the current page');
+        return;
+      }
+
+      // Check for leading underscore in any path segment
+      const segments = trimmed.split('/').filter(s => s);
+      if (segments.some(seg => seg.startsWith('_'))) {
+        alert('Path segments cannot start with underscore (_)');
+        return;
+      }
+
+      // Check for path traversal attempts
+      if (trimmed.includes('..')) {
+        alert('Path cannot contain ".." (parent directory references)');
+        return;
+      }
+
+      // Send POST request to /new endpoint
+      try {
+        const response = await fetch('/new', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            newPath: trimmed
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          // Redirect to edit mode for new page
+          window.location.href = result.newPagePath + '?edit';
+        } else {
+          const error = await response.text();
+          alert('Error creating page: ' + error);
+        }
+      } catch (err) {
+        alert('Failed to create page: ' + err.message);
+      }
+    };
+  }
+
   // Track unsaved changes
   let hasUnsavedChanges = false;
   main.addEventListener('input', () => { hasUnsavedChanges = true; });
 
-  // View link confirms if unsaved changes
-  document.getElementById('edit-view').addEventListener('click', (e) => {
+  // View button confirms if unsaved changes
+  const editViewBtn = bar.querySelector('.edit-view');
+  editViewBtn.addEventListener('click', (e) => {
     if (hasUnsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) {
       e.preventDefault();
+    } else {
+      window.location.href = location.pathname;
     }
   });
 

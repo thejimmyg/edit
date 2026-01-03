@@ -65,8 +65,15 @@ To create a new page:
 /* EDITING */
 
 Ctrl+E or ?edit enters edit mode. Content becomes editable in the browser.
-A sticky toolbar appears at the top with shortcuts help, save options, and
-View link. The header/footer are hidden.
+A sticky toolbar appears at the top with shortcuts help, save options, theme
+toggle, new page button, and View link. The header is hidden.
+
+Creating pages: Click the + icon in view or edit mode (server mode only) to
+create a new page. The prompt is pre-populated with the current directory path
+for easy editing. Enter an absolute path (e.g., "/blog/new-post"). The server
+validates the path (no .., no leading _ in segments, no root escape), creates
+the directory, generates a sample index.html with proper relative script/sitemap
+paths, and redirects to edit mode. Path cannot be the same as current page.
 
 Keyboard shortcuts:
   Ctrl+2/3/4  Heading levels
@@ -186,6 +193,8 @@ DOM cleaning (cleanDOM function, runs on paste and before save):
   - Remove all <br> elements (gallery rows are now <p> elements, not BR-separated)
   - Convert absolute _gallery/ URLs to relative paths (handles cross-page paste,
     including poster files and size variants like HASH-800.jpg, HASH-poster.jpg)
+  - Fix local links: ensure directory paths end with /index.html for file://
+    protocol compatibility (e.g., "/blog" → "/blog/index.html")
 
 Allowed elements and attributes (ALLOWED object in edit.js):
   h1-h6, p, ul, li    No attributes
