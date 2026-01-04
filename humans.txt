@@ -288,3 +288,19 @@ to max-width: 100% via CSS and still get resolution selection applied.
 
 Each page includes a <noscript> link to sitemap.html. Browsers without
 JavaScript (lynx, w3m, links, elinks) can navigate via the sitemap.
+
+/* Future */
+
+* Move the server.py to .php for use on shared hosting or rust for
+  local.
+* Share utility functionality in _script between screens to allow new
+  types of pages to re-use functionality. For example we might
+  have a landing page type, and a specific blog page type that
+  each load a specific view script.
+* Change copy and download to icons and improve the sun icon
+* Build a formatter that allows easier text editing. For example
+  \n\n for row and \n for images.
+* Make import could use dialog to prompt for import location.
+* Add full text search based on the go/fts package using sqlite
+  or MySQL for shared hosting. Will need a search icon.
+* draft.html workflow with save draft and publish.

@@ -190,7 +190,7 @@ main .container video { max-width: 100%; height: auto; }
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       // Sun icon for dark mode (click to go light), moon icon for light mode (click to go dark)
       themeToggle.innerHTML = isDark
-        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="2"/><line x1="8" y1="14" x2="8" y2="15"/><line x1="1" y1="8" x2="2" y2="8"/><line x1="14" y1="8" x2="15" y2="8"/><line x1="2.5" y1="2.5" x2="3.2" y2="3.2"/><line x1="12.8" y1="12.8" x2="13.5" y2="13.5"/><line x1="12.8" y1="2.5" x2="13.5" y2="3.2"/><line x1="2.5" y1="12.8" x2="3.2" y2="13.5"/></svg>'
+        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3.5"/><path d="M8 0v2M8 14v2M0 8h2M14 8h2M2.3 2.3l1.4 1.4M12.3 12.3l1.4 1.4M2.3 13.7l1.4-1.4M12.3 3.7l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
         : '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 8.77a6.5 6.5 0 1 1-7.27-7.27A5.5 5.5 0 1 0 14 8.77z"/></svg>';
     }
     updateThemeIcon();
