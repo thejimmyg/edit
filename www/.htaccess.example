@@ -1,0 +1,23 @@
+# ============================================================================
+# Basic Authentication - Whole Site Protection (DEFAULT)
+# ============================================================================
+# Uncomment the lines below to require authentication for the entire site.
+# This is the recommended setting for private/development sites.
+
+AuthType Basic
+AuthName "Private Site"
+AuthUserFile /var/lib/site/htpasswd
+Require valid-user
+
+# ============================================================================
+# Alternative: Protect only _server/*.php (editing endpoints)
+# ============================================================================
+# Uncomment the block below and comment out the whole-site auth above
+# if you want the site to be publicly viewable but editing protected.
+
+#<FilesMatch "\.php$">
+#    AuthType Basic
+#    AuthName "Protected Area"
+#    AuthUserFile /var/lib/site/htpasswd
+#    Require valid-user
+#</FilesMatch>

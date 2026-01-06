@@ -53,7 +53,7 @@
 html, body { margin: 0; padding: 0; }
 html {  }
 body { background: #fff; }
-main { background: #eee; color: #000; }
+main { background: #eee; color: #000; min-height: calc(100vh - 3rem); }
 body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
 @media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
@@ -68,7 +68,7 @@ header a, header a:visited { text-decoration: none; }
 header a:hover { text-decoration: underline; }
 header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
-.fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.35); backdrop-filter: saturate(300%) blur(20px); -webkit-backdrop-filter: saturate(300%) blur(20px); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.2s, transform 0.2s; color: black; }
+.fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.55); backdrop-filter: saturate(300%) blur(20px); -webkit-backdrop-filter: saturate(300%) blur(20px); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.2s, transform 0.2s; color: black; }
 .fab:hover { transform: scale(1.1); }
 .fab.visible { display: flex; }
 main .container > *:not(.gallery) { align-self: stretch; }
@@ -97,7 +97,7 @@ main .container video { max-width: 100%; height: auto; }
 [data-theme="dark"] header .theme-toggle,
 [data-theme="dark"] header .new-page,
 [data-theme="dark"] header .edit-link { color: #ccc; }
-[data-theme="dark"] .fab { background: rgba(0,0,0,0.35); color: #ccc; }
+[data-theme="dark"] .fab { background: rgba(0,0,0,0.55); color: #ccc; }
 `;
   document.head.appendChild(style);
 
@@ -242,9 +242,9 @@ main .container video { max-width: 100%; height: auto; }
           return;
         }
 
-        // Send POST request to /new endpoint
+        // Send POST request to create new page
         try {
-          const response = await fetch('/new', {
+          const response = await fetch('/_server/new.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

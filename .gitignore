@@ -1,3 +1,5 @@
+/lib/htpasswd
+/www/.htaccess
 /www/blog
+/www/index.html
 _gallery
-index.html

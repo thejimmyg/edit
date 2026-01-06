@@ -525,6 +525,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       'Ctrl+[ / ]\t\t\tRotate ±1°',
       'Ctrl+, / /\t\t\tZoom ±1%',
       'Ctrl+Arrow\t\tPan ±1%',
+      'Ctrl+;\t\t\tReset image',
       'Ctrl+Enter\t\tSave'
     ];
     alert(shortcuts.join('\n'));
@@ -688,6 +689,19 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
         } else {
           img.dataset.panY = panY;
         }
+        updateLabels();
+      }
+    }
+    // Ctrl+; for reset image (remove rotate, zoom, pan, fit)
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === ';') {
+      e.preventDefault();
+      const media = getSelectedMedia();
+      if (media) {
+        delete media.dataset.rotate;
+        delete media.dataset.zoom;
+        delete media.dataset.panX;
+        delete media.dataset.panY;
+        delete media.dataset.fit;
         updateLabels();
       }
     }
@@ -1021,7 +1035,7 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
       const html = generateHTML();
       const status = document.getElementById('edit-status');
       try {
-        const response = await fetch(location.pathname, {
+        const response = await fetch('/_server/save.php?path=' + encodeURIComponent(location.pathname), {
           method: 'POST',
           headers: { 'Content-Type': 'text/html' },
           body: html
