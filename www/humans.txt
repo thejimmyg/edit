@@ -21,12 +21,21 @@ nav), and wraps content in <main>.
 
 Single column, full width, browser defaults. Sticky header with backdrop blur.
 
-Breadcrumbs and section nav both left-aligned with gap between.
+Font: 18px desktop, 16px mobile. The 16px minimum prevents iOS Safari from
+auto-zooming when tapping contenteditable areas (iOS zooms on focus for any
+font smaller than 16px).
+
+Header: Fixed 2.5rem height with full-height touch targets. Elements use
+height: 100% with flexbox centering and horizontal padding (0.6rem). Icons
+pinned right via margin-left: auto on .header-icons wrapper.
+
+Breadcrumbs and section nav both left-aligned.
 
 Dark mode: Theme toggle (sun/moon icon) in header switches between light and
 dark themes. Respects system color scheme preference (prefers-color-scheme) on
 first visit. User preference persists in localStorage. Dark mode uses inverted
-color scheme with reduced contrast (#ccc text on #111 background).
+color scheme with reduced contrast (#ccc text on #111 background). Body links
+use bright colors for visibility (#6af blue, #c9f purple visited).
 
 Floating action button (FAB): Circular button in bottom-right corner appears
 when scrolled down >200px. Scrolls smoothly to top on click. Uses same frosted
@@ -90,6 +99,7 @@ Ctrl+.      Rotate image 90° clockwise (cycles: 0 -> 90 -> 180 -> 270 -> 0)
 Ctrl+[ / ]  Fine rotate image -1° / +1° (works with any rotation)
 Ctrl+, / /  Zoom out / in 2% (100% minimum, 200% maximum)
 Ctrl+Arrow  Pan image 1% in direction (range limited by zoom level)
+Ctrl+;      Reset image (remove rotation, zoom, pan, fit)
 Ctrl+Enter  Save (server mode only)
 
 Transforms in edit mode: Images with rotation, zoom, or pan show a purple
@@ -203,6 +213,61 @@ Allowed elements and attributes (ALLOWED object in edit.js):
   img                 src, alt, data-{fit,rotate,zoom,panX,panY,width,height,hash}, class=pending
   video               src, alt, poster, data-{fit,width,height,duration,hash}, class=pending
 
+/* PROGRESSIVE WEB APP */
+
+The site supports offline access and home screen installation via PWA features.
+
+Service worker (sw.js in root):
+  - Split caches: scripts-v* for /_script/*, content-v* for everything else
+  - Cache strategies: cache-first for _gallery/*, network-first for all else
+  - Offline mode toggle: when enabled, uses cache-first for everything
+  - Skips range requests (video streaming) to avoid partial response issues
+  - Only caches complete 200 responses, not 206 partial
+  - Auto-cleans old cache versions on activate (preserves content cache)
+
+Offline toggle: Cloud icon in header (airplane when active). Click to toggle
+offline mode. State persisted in service worker cache. When offline mode is
+disabled, cached files remain for network-first fallback.
+
+Manifest (manifest.json): Enables "Add to Home Screen" on iOS/Android.
+Standalone display mode (no browser chrome). Requires icon files at
+/_assets/icon-192.png and /_assets/icon-512.png.
+
+iOS meta tags: apple-mobile-web-app-capable and status-bar-style for proper
+iOS home screen app behavior.
+
+Form-based authentication: Apache mod_auth_form replaces basic auth for PWA
+compatibility. iOS Safari standalone mode doesn't show basic auth prompts, so
+form login is required. Session stored in cookie (7-day expiry). Login/logout
+handlers configured in VirtualHost (Containerfile), session config in .htaccess.
+PWA files excluded from auth so browsers can fetch them before login.
+
+Login page (login.html): Centered form using flexbox with height: 100% on
+html/body (not min-height: 100vh which causes scroll on mobile). Supports
+dark mode via prefers-color-scheme media query.
+
+/* CONTAINER DEPLOYMENT */
+
+Containerfile builds a PHP 8.3 Apache image. Configuration:
+  - AllowOverride All for .htaccess support
+  - Ports 8000 (HTTP) and 8443 (HTTPS)
+  - SSL module enabled, expects cert at /var/lib/site/ssl/edit.local.*
+  - Form auth modules: session, session_cookie, request, auth_form
+  - Login/logout Location handlers in VirtualHost config
+  - AddDefaultCharset UTF-8 for all text files
+
+PHP endpoints in _server/:
+  - save.php: POST to save index.html files (validates basename, blocks
+    path traversal and underscore-prefixed directories)
+  - new.php: POST to create new page directories with template index.html
+  - log.php: POST to receive remote console.log for debugging (writes to
+    Apache error log, view with docker/podman logs)
+
+Remote logging: view.js intercepts console.log/error/warn and POSTs to
+/_server/log.php. Useful for debugging iOS Safari. View logs with:
+  docker logs -f <container>
+  podman logs -f <container>
+
 /* DEVELOPMENT SERVER */
 
 Run `make serve` to start the development server. This uses serve.py, a simple
@@ -291,8 +356,6 @@ JavaScript (lynx, w3m, links, elinks) can navigate via the sitemap.
 
 /* Future */
 
-* Move the server.py to .php for use on shared hosting or rust for
-  local.
 * Share utility functionality in _script between screens to allow new
   types of pages to re-use functionality. For example we might
   have a landing page type, and a specific blog page type that
@@ -304,3 +367,6 @@ JavaScript (lynx, w3m, links, elinks) can navigate via the sitemap.
 * Add full text search based on the go/fts package using sqlite
   or MySQL for shared hosting. Will need a search icon.
 * draft.html workflow with save draft and publish.
+* Offline video support: cache full videos and serve range requests from cache.
+* Create PWA icons (/_assets/icon-192.png and /_assets/icon-512.png).
+* Remove remote logging from view.js when debugging is complete.

@@ -1,23 +1,63 @@
 # ============================================================================
-# Basic Authentication - Whole Site Protection (DEFAULT)
+# Form-Based Authentication
 # ============================================================================
-# Uncomment the lines below to require authentication for the entire site.
-# This is the recommended setting for private/development sites.
+# Uses Apache mod_auth_form for PWA-compatible authentication.
+# Sessions stored in cookies, validated against htpasswd file.
 
-AuthType Basic
-AuthName "Private Site"
+# Enable sessions
+Session On
+SessionCookieName session path=/; HttpOnly; SameSite=Strict
+SessionMaxAge 604800
+
+# Form authentication
+AuthType form
+AuthName "Private"
+AuthFormProvider file
 AuthUserFile /var/lib/site/htpasswd
-Require valid-user
+AuthFormLoginRequiredLocation /login.html
+AuthFormLoginSuccessLocation /
+
+# Login handler - processes form submission
+<Location /dologin.html>
+    SetHandler form-login-handler
+    AuthFormLoginRequiredLocation /login.html?error=1
+    AuthFormLoginSuccessLocation /
+</Location>
+
+# Logout handler
+<Location /logout.html>
+    SetHandler form-logout-handler
+    AuthFormLogoutLocation /login.html
+</Location>
+
+# Allow PWA files without auth
+SetEnvIf Request_URI "^/manifest\.json$" noauth
+SetEnvIf Request_URI "^/sw\.js$" noauth
+SetEnvIf Request_URI "^/_assets/" noauth
+SetEnvIf Request_URI "^/login\.html$" noauth
+SetEnvIf Request_URI "^/dologin\.html$" noauth
+SetEnvIf Request_URI "^/logout\.html$" noauth
+
+<RequireAny>
+    Require env noauth
+    Require valid-user
+</RequireAny>
 
 # ============================================================================
 # Alternative: Protect only _server/*.php (editing endpoints)
 # ============================================================================
-# Uncomment the block below and comment out the whole-site auth above
+# Uncomment the block below and comment out the above auth config
 # if you want the site to be publicly viewable but editing protected.
 
+#Session On
+#SessionCookieName session path=/; HttpOnly; SameSite=Strict
+#SessionMaxAge 604800
+#
 #<FilesMatch "\.php$">
-#    AuthType Basic
-#    AuthName "Protected Area"
+#    AuthType form
+#    AuthName "Protected"
+#    AuthFormProvider file
 #    AuthUserFile /var/lib/site/htpasswd
+#    AuthFormLoginRequiredLocation /login.html
 #    Require valid-user
 #</FilesMatch>

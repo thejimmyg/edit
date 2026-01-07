@@ -20,10 +20,10 @@ if (!isset($_GET['path']) || $_GET['path'] === '') {
 
 $path = $_GET['path'];
 
-// Only handle paths ending in /index.html
-if (!str_ends_with($path, '/index.html')) {
-    http_response_code(404);
-    exit('POST only supported for /*/index.html');
+// Security: only allow writing index.html files
+if (basename($path) !== 'index.html') {
+    http_response_code(403);
+    exit('Can only write index.html files');
 }
 
 // Remove leading slash to get relative path
@@ -33,6 +33,15 @@ $filePath = ltrim($path, '/');
 if (strpos($filePath, '..') !== false) {
     http_response_code(403);
     exit('Path not allowed');
+}
+
+// Security: no underscore-prefixed directories (reserved for system)
+$segments = explode('/', dirname($filePath));
+foreach ($segments as $seg) {
+    if ($seg !== '' && str_starts_with($seg, '_')) {
+        http_response_code(403);
+        exit('Cannot write to underscore-prefixed directories');
+    }
 }
 
 // Get document root and build absolute path

@@ -23,21 +23,17 @@ main .container h1, main .container h2, main .container h3, main .container h4 {
 main .container:focus { outline: none; }
 main .container img, main .container video { max-width: 200px; height: auto; margin: 0.5rem; vertical-align: middle; }
 main .container img.pending, main .container video.pending { opacity: 0.6; border: 2px dashed #999; }
-.edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; z-index: 1000; line-height: 2rem; font-size: 0.8rem; }
-.edit-bar .edit-title { font-weight: bold; }
-.edit-bar .theme-toggle { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
-.edit-bar .new-page { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
-.edit-bar .edit-view { cursor: pointer; display: inline-flex; align-items: center; border: none; background: none; padding: 0; margin-left: 1rem; color: black; }
-.edit-bar a { color: black; text-decoration: none; margin-left: 1rem; cursor: pointer; display: inline-flex; align-items: center; }
+.edit-bar { position: sticky; top: 0; left: 0; right: 0; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); display: flex; align-items: center; height: 2.5rem; z-index: 1000; font-size: 0.8rem; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.edit-bar::-webkit-scrollbar { display: none; }
+.edit-bar .edit-title { font-weight: bold; padding: 0 0.6rem; height: 100%; display: flex; align-items: center; }
+.edit-bar .edit-icons { display: flex; align-items: center; height: 100%; flex-shrink: 0; margin-left: auto; }
+.edit-bar .theme-toggle { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+.edit-bar .new-page { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+.edit-bar .edit-view { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+.edit-bar a { color: black; text-decoration: none; padding: 0 0.6rem; height: 100%; display: flex; align-items: center; cursor: pointer; }
 .edit-bar a:hover { text-decoration: underline; }
-.edit-bar button#edit-save { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin-left: 1rem; }
+.edit-bar button#edit-save { padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer; border: 1px solid #999; background: #fff; border-radius: 4px; margin: 0 0.6rem 0 0; }
 .edit-bar button#edit-save:hover { background: #e0e0e0; }
-#edit-status { color: #080; margin-right: 0.5rem; min-width: 3rem; }
-@media (max-width: 768px) {
-  .edit-bar { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
-  .edit-bar button#edit-save { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
-  .edit-bar a { margin-left: 0.5rem; }
-}
 .drop-hint { position: fixed; inset: 0; background: rgba(0,100,200,0.1); border: 4px dashed #0066cc; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #0066cc; pointer-events: none; z-index: 999; }
 main .container img[data-fit="toowide"], main .container video[data-fit="toowide"] { outline: 3px solid #e67300; }
 main .container img[data-fit="tootall"], main .container video[data-fit="tootall"] { outline: 3px solid #0066cc; }
@@ -59,7 +55,8 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
 [data-theme="dark"] .edit-bar .edit-title,
 [data-theme="dark"] .edit-bar .theme-toggle,
 [data-theme="dark"] .edit-bar .new-page,
-[data-theme="dark"] .edit-bar .edit-view { color: #ccc; }
+[data-theme="dark"] .edit-bar .edit-view,
+[data-theme="dark"] .edit-bar .edit-icons { color: #ccc; }
 [data-theme="dark"] .edit-bar button#edit-save { background: #222; color: #ccc; border-color: #555; }
 [data-theme="dark"] .edit-bar button#edit-save:hover { background: #333; }
 [data-theme="dark"] main .container img.pending,
@@ -398,11 +395,8 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   const bar = document.createElement('div');
   bar.className = 'edit-bar';
   bar.innerHTML = `
-    <div>
-      <span class="edit-title">Edit Mode</span>
-    </div>
-    <div style="display:flex;align-items:center">
-      <span id="edit-status"></span>
+    <span class="edit-title">Edit Mode</span>
+    <div class="edit-icons">
       <a id="shortcuts-link">Shortcuts</a>
       <a id="edit-download" href="#" download="index.html">Download</a>
       <a id="edit-copy">Copy</a>
@@ -438,10 +432,12 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
     newPageBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>';
     newPageBtn.onclick = async function() {
       // Get current directory (remove /index.html if present)
-      const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '');
-      const defaultPath = currentDir || '/';
+      const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '') || '';
+      const defaultPath = currentDir || '';
+      const examplePath = defaultPath + '/new-page';
+      const inputDefault = defaultPath + '/';
 
-      const newPath = prompt('Enter new page path:\nExample: "' + defaultPath + '/new-page"', defaultPath + '/');
+      const newPath = prompt('Enter new page path:\nExample: "' + examplePath + '"', inputDefault);
       if (!newPath) return;
 
       // Validate path
@@ -1002,17 +998,19 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   }
 
   // Copy to clipboard functionality
-  document.getElementById('edit-copy').addEventListener('click', async (e) => {
+  const copyLink = document.getElementById('edit-copy');
+  copyLink.addEventListener('click', async (e) => {
     e.preventDefault();
     const html = generateHTML();
-    const status = document.getElementById('edit-status');
     try {
       await navigator.clipboard.writeText(html);
-      status.textContent = 'Copied';
-      setTimeout(() => status.textContent = '', 2000);
+      copyLink.textContent = 'Copied!';
+      copyLink.style.color = '#080';
+      setTimeout(() => { copyLink.textContent = 'Copy'; copyLink.style.color = ''; }, 1500);
     } catch (err) {
-      status.textContent = 'Failed';
-      setTimeout(() => status.textContent = '', 2000);
+      copyLink.textContent = 'Failed';
+      copyLink.style.color = '#c00';
+      setTimeout(() => { copyLink.textContent = 'Copy'; copyLink.style.color = ''; }, 1500);
     }
   });
 
@@ -1033,24 +1031,41 @@ main .container img[data-rotate], main .container img[data-zoom], main .containe
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
       const html = generateHTML();
-      const status = document.getElementById('edit-status');
+      // Ensure path ends with /index.html
+      let savePath = location.pathname;
+      if (savePath === '/' || savePath === '') savePath = '/index.html';
+      else if (!savePath.endsWith('/index.html')) savePath = savePath.replace(/\/?$/, '/index.html');
       try {
-        const response = await fetch('/_server/save.php?path=' + encodeURIComponent(location.pathname), {
+        const response = await fetch('/_server/save.php?path=' + encodeURIComponent(savePath), {
           method: 'POST',
           headers: { 'Content-Type': 'text/html' },
           body: html
         });
         if (response.ok) {
-          status.textContent = 'Saved';
+          saveBtn.textContent = 'Saved!';
+          saveBtn.style.background = '#080';
+          saveBtn.style.color = '#fff';
+          saveBtn.style.borderColor = '#080';
           hasUnsavedChanges = false;
-          setTimeout(() => status.textContent = '', 2000);
+          // Update service worker cache with new content
+          if ('caches' in window) {
+            caches.open('content-v1').then(cache => {
+              cache.put(location.href.replace(/\?.*$/, ''), new Response(html, {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              }));
+            });
+          }
+          setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.style.background = ''; saveBtn.style.color = ''; saveBtn.style.borderColor = ''; }, 1500);
         } else {
           throw new Error(response.statusText);
         }
       } catch (err) {
-        status.textContent = 'Error';
+        saveBtn.textContent = 'Error';
+        saveBtn.style.background = '#c00';
+        saveBtn.style.color = '#fff';
+        saveBtn.style.borderColor = '#c00';
         console.error('Save failed:', err);
-        setTimeout(() => status.textContent = '', 2000);
+        setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.style.background = ''; saveBtn.style.color = ''; saveBtn.style.borderColor = ''; }, 1500);
       }
     });
   }

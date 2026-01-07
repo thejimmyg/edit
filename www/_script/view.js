@@ -1,4 +1,24 @@
 (function() {
+  // Remote logging for debugging (iOS Safari etc) - set to true to enable
+  const REMOTE_LOGGING = false;
+  if (REMOTE_LOGGING && location.protocol !== 'file:') {
+    let loggingEnabled = true;
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    function remoteLog(level, args) {
+      if (!loggingEnabled) return;
+      fetch('/_server/log.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level, args: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)), time: Date.now() })
+      }).catch(() => { loggingEnabled = false; });
+    }
+    console.log = function(...args) { originalLog.apply(console, args); remoteLog('log', args); };
+    console.error = function(...args) { originalError.apply(console, args); remoteLog('error', args); };
+    console.warn = function(...args) { originalWarn.apply(console, args); remoteLog('warn', args); };
+  }
+
   // Theme management - runs early to prevent flash
   function getInitialTheme() {
     const saved = localStorage.getItem('theme');
@@ -42,6 +62,47 @@
   viewport.content = 'width=device-width, initial-scale=1';
   document.head.appendChild(viewport);
 
+  // App manifest for PWA/iOS home screen
+  const manifestLink = document.createElement('link');
+  manifestLink.rel = 'manifest';
+  manifestLink.href = root + 'manifest.json';
+  document.head.appendChild(manifestLink);
+
+  // Apple-specific meta tags for iOS
+  const appleMeta = document.createElement('meta');
+  appleMeta.name = 'apple-mobile-web-app-capable';
+  appleMeta.content = 'yes';
+  document.head.appendChild(appleMeta);
+
+  const appleStatusBar = document.createElement('meta');
+  appleStatusBar.name = 'apple-mobile-web-app-status-bar-style';
+  appleStatusBar.content = 'default';
+  document.head.appendChild(appleStatusBar);
+
+  // Register service worker
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    console.log('[View] Registering service worker...');
+    navigator.serviceWorker.register(root + 'sw.js')
+      .then(reg => {
+        console.log('[View] Service worker registered:', reg.scope);
+        console.log('[View] SW state - installing:', reg.installing, 'waiting:', reg.waiting, 'active:', reg.active);
+      })
+      .catch(err => {
+        console.error('[View] Service worker registration failed:', err);
+      });
+
+    // Listen for offline mode changes from service worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      console.log('[View] Message from SW:', event.data);
+      if (event.data.type === 'OFFLINE_MODE_CHANGED') {
+        window.dispatchEvent(new CustomEvent('offlineModeChanged', { detail: event.data.enabled }));
+      }
+      if (event.data.type === 'OFFLINE_MODE_STATUS') {
+        window.dispatchEvent(new CustomEvent('offlineModeStatus', { detail: event.data.enabled }));
+      }
+    });
+  }
+
   // Layout constants
   const containerMax = 1000; // px
   const containerPad = 0.6; // rem
@@ -56,17 +117,22 @@ body { background: #fff; }
 main { background: #eee; color: #000; min-height: calc(100vh - 3rem); }
 body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 18px; line-height: 1.8rem; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
-@media (max-width: 600px) { body { font-size: 14px; line-height: 1.5rem; } }
+@media (max-width: 600px) { body { font-size: 16px; line-height: 1.5rem; } }
 .container { max-width: ${containerMax}px; margin: 0 auto; padding: 0 ${containerPad}rem; }
-header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); line-height: 2rem; font-size: 0.8rem; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; }
-header .theme-toggle { margin-left: auto; cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; }
-header .new-page { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; }
-header .edit-link { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0; color: black; text-decoration: none; }
-header .site-title { font-weight: bold; }
+header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.52); backdrop-filter: saturate(220%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); height: 2.5rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+header::-webkit-scrollbar { display: none; }
+header .header-icons { margin-left: auto; display: flex; align-items: center; height: 100%; flex-shrink: 0; }
+header .offline-toggle { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+header .offline-toggle.active { color: #0066cc; }
+header .theme-toggle { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+header .new-page { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; }
+header .edit-link { cursor: pointer; display: flex; align-items: center; border: none; background: none; padding: 0 0.6rem; height: 100%; color: black; text-decoration: none; }
+header .site-title { font-weight: bold; padding: 0 0.6rem; height: 100%; display: flex; align-items: center; }
 header a, header a:visited, header a:hover { color: black; }
 header a, header a:visited { text-decoration: none; }
 header a:hover { text-decoration: underline; }
-header nav a, header nav span { margin-right: 0.25rem; margin-left: 0.25rem }
+header nav { display: flex; align-items: center; height: 100%; }
+header nav a, header nav span { padding: 0 0.4rem; height: 100%; display: flex; align-items: center; }
 main .container { padding-top: 1rem; padding-bottom: 1rem; display: flex; flex-direction: column; align-items: center; }
 .fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,0.55); backdrop-filter: saturate(300%) blur(20px); -webkit-backdrop-filter: saturate(300%) blur(20px); border: none; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.2s, transform 0.2s; color: black; }
 .fab:hover { transform: scale(1.1); }
@@ -89,14 +155,19 @@ main .container video { max-width: 100%; height: auto; }
 /* Dark mode - inverted color scheme */
 [data-theme="dark"] body { background: #000; }
 [data-theme="dark"] main { background: #111; color: #ccc; }
+[data-theme="dark"] main a { color: #6af; }
+[data-theme="dark"] main a:visited { color: #c9f; }
 [data-theme="dark"] header { background: rgba(0,0,0,0.52); }
 [data-theme="dark"] header a,
 [data-theme="dark"] header a:visited,
 [data-theme="dark"] header a:hover,
 [data-theme="dark"] header span { color: #ccc; }
+[data-theme="dark"] header .offline-toggle,
 [data-theme="dark"] header .theme-toggle,
 [data-theme="dark"] header .new-page,
 [data-theme="dark"] header .edit-link { color: #ccc; }
+[data-theme="dark"] header .offline-toggle.active { color: #66aaff; }
+[data-theme="dark"] header .header-icons { color: #ccc; }
 [data-theme="dark"] .fab { background: rgba(0,0,0,0.55); color: #ccc; }
 `;
   document.head.appendChild(style);
@@ -181,6 +252,70 @@ main .container video { max-width: 100%; height: auto; }
     if (crumbs.length > 0) header.appendChild(breadcrumbNav);
     header.appendChild(sectionNav);
 
+    // Container for header icons (stays on right)
+    const headerIcons = document.createElement('div');
+    headerIcons.className = 'header-icons';
+
+    // Offline toggle button (cloud icon) - only when service worker available
+    let offlineToggle = null;
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      offlineToggle = document.createElement('button');
+      offlineToggle.className = 'offline-toggle';
+      offlineToggle.setAttribute('aria-label', 'Toggle offline mode');
+      offlineToggle.setAttribute('title', 'Toggle offline mode');
+      // Cloud with arrow icon (online), cloud with X (offline mode)
+      function updateOfflineIcon(enabled) {
+        if (enabled) {
+          offlineToggle.classList.add('active');
+          // Airplane icon for offline mode
+          offlineToggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M15 7.5l-4-2V2.5a1.5 1.5 0 0 0-3 0v3l-4 2v2l4-1v2.5l-1.5 1v1.5l2.5-1 2.5 1V12l-1.5-1V8.5l4 1v-2z"/></svg>';
+        } else {
+          offlineToggle.classList.remove('active');
+          // Cloud icon for online mode
+          offlineToggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13 7.5a3.5 3.5 0 0 0-6.9-.8A3 3 0 0 0 3 9.5a3 3 0 0 0 3 3h6.5a2.5 2.5 0 0 0 .5-5z"/></svg>';
+        }
+      }
+      updateOfflineIcon(false);
+
+      // Get initial offline mode status
+      console.log('[View] Waiting for SW ready...');
+      navigator.serviceWorker.ready.then(reg => {
+        console.log('[View] SW ready, active:', reg.active);
+        if (reg.active) {
+          console.log('[View] Sending GET_OFFLINE_MODE');
+          reg.active.postMessage({ type: 'GET_OFFLINE_MODE' });
+        }
+      });
+
+      // Listen for status updates
+      window.addEventListener('offlineModeStatus', (e) => {
+        console.log('[View] offlineModeStatus event:', e.detail);
+        updateOfflineIcon(e.detail);
+      });
+      window.addEventListener('offlineModeChanged', (e) => {
+        console.log('[View] offlineModeChanged event:', e.detail);
+        updateOfflineIcon(e.detail);
+      });
+
+      offlineToggle.onclick = function() {
+        console.log('[View] Offline toggle clicked');
+        const isActive = offlineToggle.classList.contains('active');
+        console.log('[View] Current state active:', isActive, '-> setting to:', !isActive);
+        navigator.serviceWorker.ready.then(reg => {
+          console.log('[View] SW ready for toggle, active:', reg.active);
+          if (reg.active) {
+            console.log('[View] Sending SET_OFFLINE_MODE:', !isActive);
+            reg.active.postMessage({ type: 'SET_OFFLINE_MODE', enabled: !isActive });
+          } else {
+            console.error('[View] No active service worker!');
+          }
+        }).catch(err => {
+          console.error('[View] SW ready failed:', err);
+        });
+      };
+      headerIcons.appendChild(offlineToggle);
+    }
+
     // Theme toggle button (sun/moon icon)
     const themeToggle = document.createElement('button');
     themeToggle.className = 'theme-toggle';
@@ -198,7 +333,7 @@ main .container video { max-width: 100%; height: auto; }
       toggleTheme();
       updateThemeIcon();
     };
-    header.appendChild(themeToggle);
+    headerIcons.appendChild(themeToggle);
 
     // New page button (+ icon) - only show when not on file:// protocol
     if (location.protocol !== 'file:') {
@@ -209,10 +344,12 @@ main .container video { max-width: 100%; height: auto; }
       newPageBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>';
       newPageBtn.onclick = async function() {
         // Get current directory (remove /index.html if present)
-        const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '');
-        const defaultPath = currentDir || '/';
+        const currentDir = location.pathname.replace('/index.html', '').replace(/\/$/, '') || '';
+        const defaultPath = currentDir || '';
+        const examplePath = defaultPath + '/new-page';
+        const inputDefault = defaultPath + '/';
 
-        const newPath = prompt('Enter new page path:\nExample: "' + defaultPath + '/new-page"', defaultPath + '/');
+        const newPath = prompt('Enter new page path:\nExample: "' + examplePath + '"', inputDefault);
         if (!newPath) return;
 
         // Validate path
@@ -264,7 +401,7 @@ main .container video { max-width: 100%; height: auto; }
           alert('Failed to create page: ' + err.message);
         }
       };
-      header.appendChild(newPageBtn);
+      headerIcons.appendChild(newPageBtn);
     }
 
     // Edit button on far right (pencil icon)
@@ -276,7 +413,8 @@ main .container video { max-width: 100%; height: auto; }
     editBtn.onclick = function() {
       window.location.href = location.pathname + '?edit';
     };
-    header.appendChild(editBtn);
+    headerIcons.appendChild(editBtn);
+    header.appendChild(headerIcons);
 
     // Floating action button (FAB) - scroll to top
     const fab = document.createElement('button');

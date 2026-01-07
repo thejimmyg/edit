@@ -1,4 +1,5 @@
 /lib/htpasswd
+/lib/ssl/
 /www/.htaccess
 /www/blog
 /www/index.html
